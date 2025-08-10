@@ -313,4 +313,71 @@
 
   /* Round modal + logic */
   const roundDlg=document.getElementById("roundDialog"), rows=document.getElementById("roundRows"), cutters=document.getElementById("cuttersGroup"), rErr=document.getElementById("roundError"), applyBtn=document.getElementById("applyRoundBtn");
-  const openRound=()=>{ rows.innerHTML=""; cutters.innerHTML=""; players.forEach(p=>{ const r=document.createElement("div"); r.className="round-row"; const lab=document.createElement("label"); lab.setAttribute("for","rr_"+p.id); lab.innerHTML=`<strong>${p.name}</strong><div class="hint">${t("current")}: ${p.score}</div>`; const inp=document.createElement("input"); inp.id="rr_"+p.id; inp.type="number"; inp.step="1"; inp.inputMode="numeric"; inp.placeholder="0"; inp.dataset.pid=p.id; inp.addEventListener("input", validateRound); const minus=document.createElement("button"); minus.type="button"; minus.className="minus10"; minus.textContent="−10"; minus.onclick=()=>{ inp.value=clampInt((inp.val
+  const openRound=()=>{ rows.innerHTML=""; cutters.innerHTML=""; players.forEach(p=>{ const r=document.createElement("div"); r.className="round-row"; const lab=document.createElement("label"); lab.setAttribute("for","rr_"+p.id); lab.innerHTML=`<strong>${p.name}</strong><div class="hint">${t("current")}: ${p.score}</div>`; const inp=document.createElement("input"); inp.id="rr_"+p.id; inp.type="number"; inp.step="1"; inp.inputMode="numeric"; inp.placeholder="0"; inp.dataset.pid=p.id; inp.addEventListener("input", validateRound); const minus=document.createElement("button"); minus.type="button"; minus.className="minus10"; minus.textContent="−10"; minus.onclick=()=>{ inp.value=clampInt((inp.value===""?0:+inp.value)-10); validateRound(); }; r.append(lab,inp,minus); rows.appendChild(r);
+    const chip=document.createElement("label"); chip.className="cut-chip"; chip.innerHTML=`<input class="visually-hidden" type="radio" name="cutter" value="${p.id}"><span>✂️ ${p.name}</span>`; chip.querySelector("input").addEventListener("change", validateRound); cutters.appendChild(chip);
+  }); const none=document.createElement("label"); none.className="cut-chip"; none.innerHTML=`<input class="visually-hidden" type="radio" name="cutter" value="" checked><span>—</span>`; none.querySelector("input").addEventListener("change", validateRound); cutters.insertBefore(none, cutters.firstChild);
+    rErr.style.display="none"; applyBtn.disabled=false; roundDlg.showModal(); };
+  const roundInputs=()=>{ const m={}; players.forEach(p=>{ const el=document.getElementById("rr_"+p.id); m[p.id]=clampInt(el?.value??0,0); }); return m; };
+  const selectedCutter=()=>{ const sel=document.querySelector('input[name="cutter"]:checked'); const v=sel?sel.value:""; return v||null; };
+  function validateRound(){ const inputs=roundInputs(); const cid=selectedCutter(); if(!cid){ rErr.style.display="none"; applyBtn.disabled=false; return true; } const c=players.find(p=>p.id===cid); if(!c){ rErr.textContent=t("cutterInvalid"); rErr.style.display=""; applyBtn.disabled=true; return false; } const proj=clampInt(c.score||0)+clampInt(inputs[c.id]??0); if(proj>limit){ rErr.textContent=(I18N[lang].cutterExceeds||I18N.en.cutterExceeds)(limit,proj); rErr.style.display=""; applyBtn.disabled=true; return false; } rErr.style.display="none"; applyBtn.disabled=false; return true; }
+
+  function applyRound(inputs,cid){
+    const proj=new Map(); players.forEach(p=>{ proj.set(p.id, clampInt(p.score||0)+clampInt(inputs[p.id]??0)); });
+
+    /* Two-player auto-win: one ≥101 and the other ≤100 */
+    if(players.length===2){
+      const [a,b]=players; const A=proj.get(a.id), B=proj.get(b.id);
+      if(A>=limit+1 && B<=limit){ a.score=A; b.score=B; gameOver=true; document.getElementById("bannerText").textContent=`${b.name} wins`; render(); return; }
+      if(B>=limit+1 && A<=limit){ a.score=A; b.score=B; gameOver=true; document.getElementById("bannerText").textContent=`${a.name} wins`; render(); return; }
+    }
+
+    /* Cutter immediate win (strict) */
+    if(cid){
+      const cProj=proj.get(cid); const ok=cProj<=limit;
+      const others=players.filter(p=>p.id!==cid); const allOver=others.every(o=>(proj.get(o.id)??o.score)>limit);
+      if(ok && allOver){ players.forEach(p=>p.score=proj.get(p.id)); gameOver=true; const nm=players.find(p=>p.id===cid)?.name||"—"; document.getElementById("bannerText").textContent=`${nm} ${t("winCut")}`; save(); render(); return; }
+    }
+
+    /* Reenganche: ANY score ≥101 */
+    players.forEach(p=>{
+      let val=proj.get(p.id);
+      if(val>=limit+1){
+        const othersUnder=players.filter(o=>o.id!==p.id).map(o=>proj.get(o.id)).filter(v=>Number.isFinite(v)&&v<=limit);
+        const maxUnder=othersUnder.length?Math.max(...othersUnder):0;
+        proj.set(p.id, maxUnder);
+        p.reenganches=(p.reenganches||0)+1;
+      }
+    });
+
+    players.forEach(p=>{ p.score=proj.get(p.id); });
+    if(autoAdvanceDealer) advanceDealer();
+    gameOver=false; render();
+  }
+
+  /* CSV */
+  const exportCSV=()=>{ const header=["name","score","reenganches","isDealer"]; const rows=players.map(p=>[csv(p.name), String(clampInt(p.score||0)), String(clampInt(p.reenganches||0)), String(p.id===nextDealerId)]); const all=[header].concat(rows).map(r=>r.join(",")).join("\n"); const blob=new Blob(["\ufeff",all],{type:"text/csv;charset=utf-8"}); const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="conga_scores.csv"; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();},0); };
+  const csv=s=>(/[",\n]/.test(s)?`"`+String(s).replace(/"/g,'""')+`"`:String(s));
+
+  /* Wire-up */
+  document.getElementById("addPlayerBtn").onclick=()=>{ const name=prompt(lang==="es"?"Nombre del jugador:":"Player name?"); if(name!==null) addPlayer(String(name).trim()||undefined); };
+  document.getElementById("newRoundBtn").onclick=()=>openRound();
+  document.getElementById("exportBtn").onclick=exportCSV;
+  document.getElementById("limitInput").oninput=e=>{ const v=clampInt(e.target.value,limit); limit=Math.max(1,v); render(); };
+  document.getElementById("autoAdvance").onchange=e=>{ autoAdvanceDealer=!!e.target.checked; render(); };
+  document.getElementById("clearAllBtn").onclick=()=>{ if(confirm(lang==="es"?"¿Limpiar todos los jugadores y ajustes?":"Clear all players and settings?")){ players=[]; limit=100; nextDealerId=null; autoAdvanceDealer=true; gameOver=false; render(); } };
+  document.getElementById("resetScoresBtn").onclick=()=>{ if(players.length&&confirm(lang==="es"?"¿Reiniciar todos los puntajes y reenganches?":"Reset all scores and reenganches?")){ players.forEach(p=>{p.score=0;p.reenganches=0;}); gameOver=false; render(); } };
+  document.getElementById("newGameBtn").onclick=()=>{ players.forEach(p=>{p.score=0;p.reenganches=0;}); gameOver=false; render(); window.scrollTo({top:0,behavior:"smooth"}); };
+  document.getElementById("roundForm").onsubmit=e=>{ e.preventDefault(); if(!validateRound()) return; const inputs=roundInputs(); const cid=selectedCutter(); if(cid){ const p=players.find(x=>x.id===cid); const projected=clampInt(p.score||0)+clampInt(inputs[p.id]??0); if(projected>limit){ document.getElementById("roundError").textContent=(I18N[lang].cutterExceeds||I18N.en.cutterExceeds)(limit,projected); document.getElementById("roundError").style.display=""; return; } } roundDlg.close(); applyRound(inputs,cid); };
+  document.getElementById("langToggle").onclick=()=>{ lang=(lang==="es"?"en":"es"); save(); render(); };
+
+  /* Init */
+  load();
+  if(players.length===0){ addPlayer(detectLang()==="es"?"Jugador 1":"Player 1"); addPlayer(detectLang()==="es"?"Player 2":"Player 2"); }
+  document.getElementById("exportBtn").title=t("exportCSV"); document.getElementById("resetScoresBtn").title=t("resetTip"); render();
+
+  /* SW */
+  if('serviceWorker' in navigator){ window.addEventListener('load', ()=>{ navigator.serviceWorker.register('service-worker.js').catch(()=>{}); }); }
+})();
+</script>
+</body>
+</html>
