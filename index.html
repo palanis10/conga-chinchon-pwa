@@ -48,35 +48,36 @@
 
   .players{ margin-top:12px } .players header{ margin:0 0 6px 0; padding:0 6px; color:var(--sub); font-size:12px; }
 
-  /* compact row = more name space */
+  /* Row layout: big avatar, protected score column */
   .row{
     display:grid;
-    grid-template-columns: 26px 1fr 84px 110px; /* drag | name | score | actions */
+    grid-template-columns: 30px 1fr 84px 108px; /* drag | name+avatar | score | actions */
     align-items:center; gap:10px;
     padding:10px; border-radius:14px;
     border:1px solid rgba(255,255,255,.06);
     background: linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,0));
     margin-bottom:8px;
   }
-  @media (min-width:760px){ .row{ grid-template-columns: 30px 1fr 110px 140px; } }
+  @media (min-width:760px){ .row{ grid-template-columns: 34px 1fr 110px 132px; } }
   .drag{ cursor:grab; text-align:center; font-size:18px; color:var(--sub) }
-  .row.dealer{ border-color: rgba(122,162,255,.4); background: linear-gradient(180deg, rgba(122,162,255,.08), rgba(255,255,255,0)); }
+  .row.dealer{ border-color: rgba(78,225,160,.6); box-shadow: 0 0 0 2px rgba(78,225,160,.25) inset; }
 
-  .name{ display:flex; align-items:center; gap:10px; min-width:0; flex:1; }
+  .name-wrap{ display:flex; align-items:center; gap:12px; min-width:0; }
   .avatar{
-    width:34px; height:34px; border-radius:50%; flex:0 0 auto; display:grid; place-items:center;
+    width:48px; height:48px; border-radius:50%; flex:0 0 auto; display:grid; place-items:center;
     background:#0f1428; border:1px solid rgba(255,255,255,.14); overflow:hidden; font-weight:800;
   }
+  .row.dealer .avatar{ box-shadow: 0 0 0 3px #4ee1a0, 0 0 0 6px rgba(78,225,160,.25); }
   .avatar img{ width:100%; height:100%; object-fit:cover; display:block; }
-  .name strong{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:15px }
-  .stars{ color:#ff6b6b; font-size:14px; letter-spacing:.8px; white-space:nowrap } /* red star(s) indicate reenganches */
+  .playerName{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:18px; font-weight:800 }
+  .stars{ color:#ff6b6b; font-size:15px; letter-spacing:.8px; white-space:nowrap }
 
   .score{ font-variant-numeric: tabular-nums; font-weight:900; text-align:right; font-size:18px; }
   .score.over{ color:var(--danger) }
 
-  .row .actions{ display:flex; gap:6px; justify-content:flex-end }
+  .actions{ display:flex; gap:6px; justify-content:flex-end }
   .iconbtn{ width:36px; height:36px; display:grid; place-items:center; border-radius:10px; border:1px solid rgba(255,255,255,.08); background:#0f1428; color:var(--text); cursor:pointer; }
-  .iconbtn[data-role="dealer"]{ background:linear-gradient(135deg, var(--accent), #9f7cff); color:#0b0f1f; font-weight:900 }
+  .iconbtn.crown{ opacity:.6 } .iconbtn.crown:hover{ opacity:1 }
   .iconbtn.danger{ background: linear-gradient(135deg, #41141b, #2a0e12); color:#ff9aa8; border-color:rgba(255,0,0,.2) }
 
   .banner{ margin:10px 0; padding:10px 12px; border-radius:14px; border:1px solid rgba(255,255,255,.1);
@@ -98,7 +99,7 @@
   .hint{ color:var(--sub); font-size:12px }
 
   @media (max-width: 480px){
-    .row{ grid-template-columns: 26px 1fr 72px 94px; gap:8px; }
+    .row{ grid-template-columns: 30px 1fr 74px 96px; gap:8px; }
     .iconbtn{ width:32px; height:32px; }
     .score{ font-size:17px; }
   }
@@ -128,7 +129,7 @@
     </div>
     <div class="dealer-badge">
       <div><strong data-i18n="nextDealer">Next dealer:</strong> <span id="nextDealerName">—</span></div>
-      <div class="hint" data-i18n="dealerHint">Tap the purple “D” on a player to set them as dealer.</div>
+      <div class="hint" data-i18n="dealerHint">Tap and hold the avatar (or use 👑) to set dealer.</div>
     </div>
   </section>
 
@@ -202,6 +203,21 @@
             <input id="editReeng" type="number" step="1" min="0" />
           </div>
         </div>
+
+        <!-- Photo controls and dealer switch -->
+        <div style="display:grid; gap:10px; margin-top:8px">
+          <div>
+            <label>Photo</label>
+            <div style="display:flex; gap:8px; flex-wrap:wrap">
+              <button type="button" class="btn" id="changePhotoBtn">Change photo</button>
+              <button type="button" class="btn ghost" id="removePhotoBtn">Remove photo</button>
+            </div>
+          </div>
+          <label class="switch" style="display:flex; align-items:center; gap:10px">
+            <input id="setDealerSwitch" type="checkbox">
+            <span>Set as next dealer</span>
+          </label>
+        </div>
       </div>
     </div>
     <div class="modal-foot">
@@ -215,22 +231,22 @@
 <template id="playerRowTpl">
   <div class="row" draggable="true" aria-grabbed="false">
     <div class="drag" title="Drag to reorder" aria-hidden="true">≡</div>
-    <div class="name">
+    <div class="name-wrap">
       <div class="avatar" aria-hidden="true"><span class="initials"></span></div>
       <strong class="playerName"></strong>
       <span class="stars" aria-label="Reenganches"></span>
     </div>
     <div class="score" aria-label="Score"><span class="scoreVal">0</span></div>
     <div class="actions">
-      <button class="iconbtn" title="Set as next dealer" data-role="dealer" aria-label="Set as next dealer">D</button>
-      <button class="iconbtn" title="Set photo" data-action="photo" aria-label="Set photo">📷</button>
+      <button class="iconbtn crown" title="Set as next dealer" data-role="dealer" aria-label="Set dealer">👑</button>
       <button class="iconbtn" title="Edit player" data-action="edit" aria-label="Edit player">✎</button>
       <button class="iconbtn danger" title="Remove player" data-action="remove" aria-label="Remove player">🗑</button>
     </div>
   </div>
 </template>
 
-<input id="photoInput" type="file" accept="image/*" capture="environment" hidden>
+<!-- Hidden file input (no capture so iOS shows camera or library) -->
+<input id="photoInput" type="file" accept="image/*" hidden>
 
 <script>
 (() => {
@@ -238,8 +254,8 @@
 
   /* i18n */
   const I18N = {
-    en:{title:"Scorekeeper",resetScores:"Reset scores",resetTip:"Reset all scores to 0",limitLabel:"Limit (default 100)",autoAdvance:"Auto-advance dealer after round",nextDealer:"Next dealer:",dealerHint:"Tap the purple “D” on a player to set them as dealer.",players:"Players",addPlayer:"+ Add player",gameOver:"Game over",newGame:"New game",newRound:"New round",exportCSV:"Export CSV",clearAll:"Clear all",roundTitle:"New Round",roundHint:"Enter per-player points (negatives allowed). Quick “−10” applies to the input, not the total.",whoCut:"Who cut (cortó)?",optional:"(optional)",close:"Close",cancel:"Cancel",apply:"Apply",editPlayer:"Edit player",name:"Name",score:"Score",reenganches:"Reenganches",save:"Save",winCut:"wins! Cut victory (all others > limit)",cutterInvalid:"Invalid cutter selected.",cutterExceeds:(limit,projected)=>`Cutter cannot exceed ${limit}. (Projected: ${projected})`,player:"Player",current:"Current"},
-    es:{title:"Marcador",resetScores:"Reiniciar puntajes",resetTip:"Poner todos los puntajes en 0",limitLabel:"Límite (por defecto 100)",autoAdvance:"Avanzar repartidor automáticamente después de la ronda",nextDealer:"Próximo repartidor:",dealerHint:"Toca la “D” morada junto al jugador para marcarlo como repartidor.",players:"Jugadores",addPlayer:"+ Agregar jugador",gameOver:"Partida terminada",newGame:"Nueva partida",newRound:"Nueva ronda",exportCSV:"Exportar CSV",clearAll:"Limpiar todo",roundTitle:"Nueva ronda",roundHint:"Ingresa los puntos por jugador (se permiten negativos). “−10” aplica al campo, no al total.",whoCut:"¿Quién cortó?",optional:"(opcional)",close:"Cerrar",cancel:"Cancelar",apply:"Aplicar",editPlayer:"Editar jugador",name:"Nombre",score:"Puntaje",reenganches:"Reenganches",save:"Guardar",winCut:"¡gana! Corte con victoria (los demás > límite)",cutterInvalid:"Cortador inválido.",cutterExceeds:(limit,projected)=>`El cortador no puede pasar de ${limit}. (Proyectado: ${projected})`,player:"Jugador",current:"Actual"}
+    en:{title:"Scorekeeper",resetScores:"Reset scores",resetTip:"Reset all scores to 0",limitLabel:"Limit (default 100)",autoAdvance:"Auto-advance dealer after round",nextDealer:"Next dealer:",dealerHint:"Tap and hold the avatar (or use 👑) to set dealer.",players:"Players",addPlayer:"+ Add player",gameOver:"Game over",newGame:"New game",newRound:"New round",exportCSV:"Export CSV",clearAll:"Clear all",roundTitle:"New Round",roundHint:"Enter per-player points (negatives allowed). Quick “−10” applies to the input, not the total.",whoCut:"Who cut (cortó)?",optional:"(optional)",close:"Close",cancel:"Cancel",apply:"Apply",editPlayer:"Edit player",name:"Name",score:"Score",reenganches:"Reenganches",save:"Save",winCut:"wins! Cut victory (all others > limit)",cutterInvalid:"Invalid cutter selected.",cutterExceeds:(limit,projected)=>`Cutter cannot exceed ${limit}. (Projected: ${projected})`,player:"Player",current:"Current"},
+    es:{title:"Marcador",resetScores:"Reiniciar puntajes",resetTip:"Poner todos los puntajes en 0",limitLabel:"Límite (por defecto 100)",autoAdvance:"Avanzar repartidor automáticamente después de la ronda",nextDealer:"Próximo repartidor:",dealerHint:"Mantén presionado el avatar (o usa 👑) para marcar repartidor.",players:"Jugadores",addPlayer:"+ Agregar jugador",gameOver:"Partida terminada",newGame:"Nueva partida",newRound:"Nueva ronda",exportCSV:"Exportar CSV",clearAll:"Limpiar todo",roundTitle:"Nueva ronda",roundHint:"Ingresa los puntos por jugador (se permiten negativos). “−10” aplica al campo, no al total.",whoCut:"¿Quién cortó?",optional:"(opcional)",close:"Cerrar",cancel:"Cancelar",apply:"Aplicar",editPlayer:"Editar jugador",name:"Nombre",score:"Puntaje",reenganches:"Reenganches",save:"Guardar",winCut:"¡gana! Corte con victoria (los demás > límite)",cutterInvalid:"Cortador inválido.",cutterExceeds:(limit,projected)=>`El cortador no puede pasar de ${limit}. (Proyectado: ${projected})`,player:"Jugador",current:"Actual"}
   };
   const LangKey="conga_lang";
   const detectLang=()=>{const s=localStorage.getItem(LangKey); if(s&&I18N[s]) return s; return (navigator.language||"en").toLowerCase().startsWith("es")?"es":"en";};
@@ -248,7 +264,7 @@
   const applyI18n=()=>{document.documentElement.lang=lang; document.querySelectorAll("[data-i18n]").forEach(el=>{el.textContent=t(el.getAttribute("data-i18n"));}); document.querySelectorAll("[data-i18n-title]").forEach(el=>{el.title=t(el.getAttribute("data-i18n-title"));}); document.getElementById("langToggle").textContent=(lang==="es"?"EN":"ES");};
 
   /* State */
-  const storageKey="conga_state_clean_v1";
+  const storageKey="conga_state_clean_v2";
   let players=[], limit=100, nextDealerId=null, autoAdvanceDealer=true, gameOver=false;
 
   /* Utils */
@@ -272,18 +288,41 @@
       n.dataset.index=i; n.dataset.id=p.id;
       n.addEventListener("dragstart",dragStart); n.addEventListener("dragover",dragOver); n.addEventListener("drop",drop); n.addEventListener("dragend",dragEnd);
       if(p.id===nextDealerId) n.classList.add("dealer");
+
+      // name/visuals
+      const avatarBox=n.querySelector(".avatar");
+      const init=avatarBox.querySelector(".initials");
+      init.textContent=initials(p.name);
+      if(p.avatar){ avatarBox.innerHTML=`<img alt="" src="${p.avatar}">`; }
       n.querySelector(".playerName").textContent=p.name;
       n.querySelector(".stars").textContent="★".repeat(Math.max(0,p.reenganches||0));
-      const av=n.querySelector(".avatar"); const init=av.querySelector(".initials"); init.textContent=initials(p.name); if(p.avatar){ av.innerHTML=`<img alt="" src="${p.avatar}">`; }
-      const sv=n.querySelector(".scoreVal"); sv.textContent=clampInt(p.score||0); if((p.score||0)>limit) n.querySelector(".score").classList.add("over"); else n.querySelector(".score").classList.remove("over");
+
+      // long-press avatar to set dealer
+      attachLongPress(avatarBox, ()=>setDealer(p.id));
+
+      // score
+      const sv=n.querySelector(".scoreVal"); sv.textContent=clampInt(p.score||0);
+      if((p.score||0)>limit) n.querySelector(".score").classList.add("over"); else n.querySelector(".score").classList.remove("over");
+
+      // actions
       n.querySelector('[data-role="dealer"]').onclick=()=>setDealer(p.id);
       n.querySelector('[data-action="edit"]').onclick=()=>openEdit(p.id);
       n.querySelector('[data-action="remove"]').onclick=()=>removePlayer(p.id);
-      n.querySelector('[data-action="photo"]').onclick=()=>photo(p.id);
+
       list.appendChild(n);
     });
     $("#newRoundBtn").disabled=players.length===0||gameOver; $("#exportBtn").disabled=players.length===0; $("#resetScoresBtn").disabled=players.length===0;
     applyI18n(); save();
+  }
+
+  /* Long-press helper */
+  function attachLongPress(el, cb){
+    let t;
+    const start = ()=>{ t=setTimeout(cb,650); };
+    const end = ()=>{ clearTimeout(t); };
+    el.addEventListener('touchstart', start, {passive:true});
+    el.addEventListener('mousedown', start);
+    ['touchend','touchcancel','mouseup','mouseleave'].forEach(ev=>el.addEventListener(ev, end));
   }
 
   /* Drag & drop */
@@ -301,19 +340,51 @@
   const addPlayer=(name="")=>{ const p={id:uid(), name:name||`${t("player")} ${players.length+1}`, score:0, reenganches:0, avatar:null}; players.push(p); if(!nextDealerId) nextDealerId=p.id; gameOver=false; render(); };
   const removePlayer=id=>{ const i=players.findIndex(p=>p.id===id); if(i<0) return; const was=players[i].id===nextDealerId; players.splice(i,1); if(!players.length) nextDealerId=null; else if(was) nextDealerId=players[Math.min(i,players.length-1)].id; render(); };
 
-  /* Photo / camera */
-  const input=document.getElementById("photoInput"); let photoTarget=null;
-  const photo=id=>{ photoTarget=id; input.value=""; input.click(); };
-  input.addEventListener("change", async()=>{ if(!photoTarget||!input.files?.[0]) return; const f=input.files[0]; const url=await new Promise((res,rej)=>{const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=rej; r.readAsDataURL(f);}); const p=players.find(x=>x.id===photoTarget); if(p){ p.avatar=url; render(); } photoTarget=null; });
+  /* Hidden file input (camera or upload) */
+  const photoInput=document.getElementById("photoInput"); let photoTarget=null;
+  photoInput.removeAttribute('capture'); // allow both Camera and Photo Library on iOS
+  photoInput.addEventListener("change", async()=>{
+    if(!photoTarget||!photoInput.files?.[0]) return;
+    const file=photoInput.files[0];
+    const dataUrl=await new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=rej; r.readAsDataURL(file); });
+    const p=players.find(x=>x.id===photoTarget); if(p){ p.avatar=dataUrl; render(); }
+    photoTarget=null;
+  });
 
   /* Edit dialog */
   const editDlg=document.getElementById("editDialog"), editForm=document.getElementById("editForm");
-  const openEdit=id=>{ const p=players.find(x=>x.id===id); if(!p) return; document.getElementById("editId").value=p.id; document.getElementById("editName").value=p.name; document.getElementById("editScore").value=clampInt(p.score||0); document.getElementById("editReeng").value=clampInt(p.reenganches||0); editDlg.showModal(); };
-  editForm.addEventListener("submit",e=>{ e.preventDefault(); const id=document.getElementById("editId").value; const p=players.find(x=>x.id===id); if(!p) return editDlg.close(); p.name=String(document.getElementById("editName").value||"").trim()||p.name; p.score=clampInt(document.getElementById("editScore").value,p.score); p.reenganches=Math.max(0,clampInt(document.getElementById("editReeng").value,p.reenganches)); editDlg.close(); render(); });
+  const changePhotoBtn = ()=>document.getElementById("changePhotoBtn");
+  const removePhotoBtn = ()=>document.getElementById("removePhotoBtn");
+  const setDealerSwitch = ()=>document.getElementById("setDealerSwitch");
+
+  function openEdit(id){
+    const p=players.find(x=>x.id===id); if(!p) return;
+    $("#editId").value=p.id;
+    $("#editName").value=p.name;
+    $("#editScore").value=clampInt(p.score||0);
+    $("#editReeng").value=clampInt(p.reenganches||0);
+    setDealerSwitch().checked = (p.id === nextDealerId);
+
+    // wire buttons each open
+    changePhotoBtn().onclick = ()=>{ photoTarget=p.id; photoInput.value=""; photoInput.click(); };
+    removePhotoBtn().onclick = ()=>{ p.avatar=null; render(); };
+
+    editDlg.showModal();
+  }
+
+  editForm.addEventListener("submit", (e)=>{
+    e.preventDefault();
+    const id=$("#editId").value; const p=players.find(x=>x.id===id); if(!p) return editDlg.close();
+    p.name = String($("#editName").value||"").trim() || p.name;
+    p.score = clampInt($("#editScore").value, p.score);
+    p.reenganches = Math.max(0, clampInt($("#editReeng").value, p.reenganches));
+    if (setDealerSwitch().checked) nextDealerId = p.id;
+    editDlg.close(); render();
+  });
 
   /* Round modal + logic */
   const roundDlg=document.getElementById("roundDialog"), rows=document.getElementById("roundRows"), cutters=document.getElementById("cuttersGroup"), rErr=document.getElementById("roundError"), applyBtn=document.getElementById("applyRoundBtn");
-  const openRound=()=>{ rows.innerHTML=""; cutters.innerHTML=""; players.forEach(p=>{ const r=document.createElement("div"); r.className="round-row"; const lab=document.createElement("label"); lab.setAttribute("for","rr_"+p.id); lab.innerHTML=`<strong>${p.name}</strong><div class="hint">${t("current")}: ${p.score}</div>`; const inp=document.createElement("input"); inp.id="rr_"+p.id; inp.type="number"; inp.step="1"; inp.inputMode="numeric"; inp.placeholder="0"; inp.dataset.pid=p.id; inp.addEventListener("input", validateRound); const minus=document.createElement("button"); minus.type="button"; minus.className="minus10"; minus.textContent="−10"; minus.onclick=()=>{ inp.value=clampInt((inp.value===""?0:+inp.value)-10); validateRound(); }; r.append(lab,inp,minus); rows.appendChild(r);
+  const openRound=()=>{ rows.innerHTML=""; cutters.innerHTML=""; players.forEach(p=>{ const r=document.createElement("div"); r.className="round-row"; const lab=document.createElement("label"); lab.setAttribute("for","rr_"+p.id); lab.innerHTML=`<strong>${p.name}</strong><div class="hint">${t("current")}: ${p.score||0}</div>`; const inp=document.createElement("input"); inp.id="rr_"+p.id; inp.type="number"; inp.step="1"; inp.inputMode="numeric"; inp.placeholder="0"; inp.dataset.pid=p.id; inp.addEventListener("input", validateRound); const minus=document.createElement("button"); minus.type="button"; minus.className="minus10"; minus.textContent="−10"; minus.onclick=()=>{ inp.value=clampInt((inp.value===""?0:+inp.value)-10); validateRound(); }; r.append(lab,inp,minus); rows.appendChild(r);
     const chip=document.createElement("label"); chip.className="cut-chip"; chip.innerHTML=`<input class="visually-hidden" type="radio" name="cutter" value="${p.id}"><span>✂️ ${p.name}</span>`; chip.querySelector("input").addEventListener("change", validateRound); cutters.appendChild(chip);
   }); const none=document.createElement("label"); none.className="cut-chip"; none.innerHTML=`<input class="visually-hidden" type="radio" name="cutter" value="" checked><span>—</span>`; none.querySelector("input").addEventListener("change", validateRound); cutters.insertBefore(none, cutters.firstChild);
     rErr.style.display="none"; applyBtn.disabled=false; roundDlg.showModal(); };
@@ -372,7 +443,7 @@
 
   /* Init */
   load();
-  if(players.length===0){ addPlayer(detectLang()==="es"?"Jugador 1":"Player 1"); addPlayer(detectLang()==="es"?"Player 2":"Player 2"); }
+  if(players.length===0){ addPlayer(detectLang()==="es"?"Jugador 1":"Player 1"); addPlayer(detectLang()==="es"?"Jugador 2":"Player 2"); }
   document.getElementById("exportBtn").title=t("exportCSV"); document.getElementById("resetScoresBtn").title=t("resetTip"); render();
 
   /* SW */
