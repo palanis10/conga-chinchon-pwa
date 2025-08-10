@@ -103,6 +103,34 @@
     .iconbtn{ width:32px; height:32px; }
     .score{ font-size:17px; }
   }
+
+  /* WIN OVERLAY */
+  .win-overlay {
+    position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+    background: rgba(5,8,20,.55); z-index: 9999; padding: 16px;
+  }
+  .win-card {
+    width: min(560px, 94vw); border-radius: 20px; padding: 14px;
+    border: 1px solid rgba(255,255,255,.12);
+    background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02)), #0f1428;
+    box-shadow: 0 24px 64px rgba(0,0,0,.55); position: relative; overflow: hidden;
+  }
+  .win-head { display:flex; align-items:center; gap:12px; }
+  .win-photo { width:72px; height:72px; border-radius:50%; overflow:hidden; border:2px solid #4ee1a0; box-shadow:0 0 0 6px rgba(78,225,160,.25); }
+  .win-photo img{ width:100%; height:100%; object-fit:cover; }
+  .win-name { font-size: 22px; font-weight: 900; }
+  .win-sub { color:#b8c0ff; }
+  #confettiCanvas { position:absolute; inset:0; pointer-events:none; }
+  .win-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:10px; flex-wrap:wrap; }
+
+  /* CROP MODAL */
+  #cropDialog canvas { width: 100%; height: auto; background:#0e1326; border-radius:12px; border:1px solid rgba(255,255,255,.12); touch-action: none; }
+  .crop-controls { display:flex; gap:10px; align-items:center; justify-content:space-between; margin-top:10px; }
+  .crop-frame-hint { color:#b8c0ff; font-size:12px; }
+
+  /* CUT HISTORY */
+  .history-list { display:grid; gap:8px; max-height:50vh; overflow:auto; }
+  .history-item { padding:8px; border-radius:10px; border:1px solid rgba(255,255,255,.08); background:rgba(255,255,255,.02); }
 </style>
 </head>
 <body>
@@ -211,6 +239,7 @@
             <div style="display:flex; gap:8px; flex-wrap:wrap">
               <button type="button" class="btn" id="changePhotoBtn">Change photo</button>
               <button type="button" class="btn ghost" id="removePhotoBtn">Remove photo</button>
+              <button type="button" class="btn ghost" id="viewHistoryBtn">View cut history</button>
             </div>
           </div>
           <label class="switch" style="display:flex; align-items:center; gap:10px">
@@ -225,6 +254,59 @@
       <button class="btn success" type="submit" data-i18n="save">Save</button>
     </div>
   </form>
+</dialog>
+
+<!-- Win overlay -->
+<div class="win-overlay" id="winOverlay" aria-live="polite">
+  <div class="win-card">
+    <canvas id="confettiCanvas"></canvas>
+    <div class="win-head">
+      <div class="win-photo"><img id="winPhoto" alt=""></div>
+      <div>
+        <div class="win-name" id="winName">Winner</div>
+        <div class="win-sub" id="winSubtitle">Game over</div>
+      </div>
+    </div>
+    <div class="win-actions">
+      <button class="btn success" id="winCloseBtn">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Audio (tiny embedded fanfare) -->
+<audio id="winSound" preload="auto">
+  <source src="data:audio/mp3;base64,//uQZAAAAAAAAAAAAAAAAAAAAAAAACwAAAAAAQAAABgAABcAAABWAAABAAABAAAABAAAAAEAAAEAAABbAAABAAAAPwD///8AAP//AAD//wAA//8AAH//AP//AAD//wD//wAA//8AAH//AP//AAD//wD//wAA" type="audio/mpeg">
+</audio>
+
+<!-- Crop dialog -->
+<dialog id="cropDialog" aria-labelledby="cropTitle">
+  <div class="modal-head">
+    <div id="cropTitle" style="font-weight:800">Crop photo</div>
+    <button class="btn ghost" onclick="cropDialog.close()">Close</button>
+  </div>
+  <div class="modal-body">
+    <div class="crop-frame-hint">Drag to position. Pinch to zoom (on phone) or use slider.</div>
+    <canvas id="cropCanvas" width="600" height="600"></canvas>
+    <div class="crop-controls">
+      <input id="cropZoom" type="range" min="0.6" max="3" step="0.01" value="1" style="flex:1">
+      <button class="btn" id="cropReset">Reset</button>
+    </div>
+  </div>
+  <div class="modal-foot">
+    <button class="btn ghost" onclick="cropDialog.close()">Cancel</button>
+    <button class="btn success" id="cropSave">Save</button>
+  </div>
+</dialog>
+
+<!-- Cut history dialog -->
+<dialog id="historyDialog" aria-labelledby="historyTitle">
+  <div class="modal-head">
+    <div id="historyTitle" style="font-weight:800">Cut history</div>
+    <button class="btn ghost" onclick="historyDialog.close()">Close</button>
+  </div>
+  <div class="modal-body">
+    <div class="history-list" id="historyList"></div>
+  </div>
 </dialog>
 
 <!-- Row template -->
@@ -245,7 +327,7 @@
   </div>
 </template>
 
-<!-- Hidden file input (no capture so iOS shows camera or library) -->
+<!-- Hidden file input (no capture so iOS shows Camera or Photo Library) -->
 <input id="photoInput" type="file" accept="image/*" hidden>
 
 <script>
@@ -264,8 +346,12 @@
   const applyI18n=()=>{document.documentElement.lang=lang; document.querySelectorAll("[data-i18n]").forEach(el=>{el.textContent=t(el.getAttribute("data-i18n"));}); document.querySelectorAll("[data-i18n-title]").forEach(el=>{el.title=t(el.getAttribute("data-i18n-title"));}); document.getElementById("langToggle").textContent=(lang==="es"?"EN":"ES");};
 
   /* State */
-  const storageKey="conga_state_clean_v2";
+  const storageKey="conga_state_final_v1";
   let players=[], limit=100, nextDealerId=null, autoAdvanceDealer=true, gameOver=false;
+
+  /* Cut history (simple) */
+  let cutsHistory=[]; // [{id,name,round,timestamp,result}]
+  let roundCounter=0;
 
   /* Utils */
   const $=s=>document.querySelector(s);
@@ -273,8 +359,8 @@
   const clampInt=(v,d=0)=>Number.isFinite(+v)?Math.trunc(+v):d;
   const initials=(n)=> (n||" ").trim().split(/\s+/).map(s=>s[0]).join("").slice(0,2).toUpperCase();
 
-  const save=()=>{localStorage.setItem(storageKey, JSON.stringify({players,limit,nextDealerId,autoAdvanceDealer,gameOver})); localStorage.setItem(LangKey,lang);};
-  const load=()=>{try{const s=JSON.parse(localStorage.getItem(storageKey)||"{}"); players=s.players||[]; limit=Number.isFinite(s.limit)?s.limit:100; nextDealerId=(typeof s.nextDealerId==="string")?s.nextDealerId:(players[0]?.id??null); autoAdvanceDealer=!!s.autoAdvanceDealer; gameOver=!!s.gameOver;}catch{} const L=localStorage.getItem(LangKey); if(L&&I18N[L]) lang=L;};
+  const save=()=>{localStorage.setItem(storageKey, JSON.stringify({players,limit,nextDealerId,autoAdvanceDealer,gameOver,cutsHistory,roundCounter})); localStorage.setItem(LangKey,lang);};
+  const load=()=>{try{const s=JSON.parse(localStorage.getItem(storageKey)||"{}"); players=s.players||[]; limit=Number.isFinite(s.limit)?s.limit:100; nextDealerId=(typeof s.nextDealerId==="string")?s.nextDealerId:(players[0]?.id??null); autoAdvanceDealer=!!s.autoAdvanceDealer; gameOver=!!s.gameOver; cutsHistory=s.cutsHistory||[]; roundCounter=s.roundCounter||0;}catch{} const L=localStorage.getItem(LangKey); if(L&&I18N[L]) lang=L;};
 
   /* Render */
   const list=$("#playersList"), rowTpl=document.getElementById("playerRowTpl");
@@ -294,11 +380,11 @@
       const init=avatarBox.querySelector(".initials");
       init.textContent=initials(p.name);
       if(p.avatar){ avatarBox.innerHTML=`<img alt="" src="${p.avatar}">`; }
-      n.querySelector(".playerName").textContent=p.name;
-      n.querySelector(".stars").textContent="★".repeat(Math.max(0,p.reenganches||0));
-
       // long-press avatar to set dealer
       attachLongPress(avatarBox, ()=>setDealer(p.id));
+
+      n.querySelector(".playerName").textContent=p.name;
+      n.querySelector(".stars").textContent="★".repeat(Math.max(0,p.reenganches||0));
 
       // score
       const sv=n.querySelector(".scoreVal"); sv.textContent=clampInt(p.score||0);
@@ -340,23 +426,20 @@
   const addPlayer=(name="")=>{ const p={id:uid(), name:name||`${t("player")} ${players.length+1}`, score:0, reenganches:0, avatar:null}; players.push(p); if(!nextDealerId) nextDealerId=p.id; gameOver=false; render(); };
   const removePlayer=id=>{ const i=players.findIndex(p=>p.id===id); if(i<0) return; const was=players[i].id===nextDealerId; players.splice(i,1); if(!players.length) nextDealerId=null; else if(was) nextDealerId=players[Math.min(i,players.length-1)].id; render(); };
 
-  /* Hidden file input (camera or upload) */
+  /* Photo input */
   const photoInput=document.getElementById("photoInput"); let photoTarget=null;
-  photoInput.removeAttribute('capture'); // allow both Camera and Photo Library on iOS
+  photoInput.removeAttribute('capture'); // allow both Camera and Photo Library
   photoInput.addEventListener("change", async()=>{
     if(!photoTarget||!photoInput.files?.[0]) return;
     const file=photoInput.files[0];
     const dataUrl=await new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=rej; r.readAsDataURL(file); });
-    const p=players.find(x=>x.id===photoTarget); if(p){ p.avatar=dataUrl; render(); }
+    openCropper(dataUrl, photoTarget); // cropper flow
     photoTarget=null;
   });
 
   /* Edit dialog */
   const editDlg=document.getElementById("editDialog"), editForm=document.getElementById("editForm");
-  const changePhotoBtn = ()=>document.getElementById("changePhotoBtn");
-  const removePhotoBtn = ()=>document.getElementById("removePhotoBtn");
   const setDealerSwitch = ()=>document.getElementById("setDealerSwitch");
-
   function openEdit(id){
     const p=players.find(x=>x.id===id); if(!p) return;
     $("#editId").value=p.id;
@@ -364,14 +447,12 @@
     $("#editScore").value=clampInt(p.score||0);
     $("#editReeng").value=clampInt(p.reenganches||0);
     setDealerSwitch().checked = (p.id === nextDealerId);
-
-    // wire buttons each open
-    changePhotoBtn().onclick = ()=>{ photoTarget=p.id; photoInput.value=""; photoInput.click(); };
-    removePhotoBtn().onclick = ()=>{ p.avatar=null; render(); };
-
+    // buttons
+    document.getElementById("changePhotoBtn").onclick = ()=>{ photoTarget=p.id; photoInput.value=""; photoInput.click(); };
+    document.getElementById("removePhotoBtn").onclick = ()=>{ p.avatar=null; render(); };
+    document.getElementById("viewHistoryBtn").onclick = ()=> openHistory(p.id);
     editDlg.showModal();
   }
-
   editForm.addEventListener("submit", (e)=>{
     e.preventDefault();
     const id=$("#editId").value; const p=players.find(x=>x.id===id); if(!p) return editDlg.close();
@@ -385,8 +466,8 @@
   /* Round modal + logic */
   const roundDlg=document.getElementById("roundDialog"), rows=document.getElementById("roundRows"), cutters=document.getElementById("cuttersGroup"), rErr=document.getElementById("roundError"), applyBtn=document.getElementById("applyRoundBtn");
   const openRound=()=>{ rows.innerHTML=""; cutters.innerHTML=""; players.forEach(p=>{ const r=document.createElement("div"); r.className="round-row"; const lab=document.createElement("label"); lab.setAttribute("for","rr_"+p.id); lab.innerHTML=`<strong>${p.name}</strong><div class="hint">${t("current")}: ${p.score||0}</div>`; const inp=document.createElement("input"); inp.id="rr_"+p.id; inp.type="number"; inp.step="1"; inp.inputMode="numeric"; inp.placeholder="0"; inp.dataset.pid=p.id; inp.addEventListener("input", validateRound); const minus=document.createElement("button"); minus.type="button"; minus.className="minus10"; minus.textContent="−10"; minus.onclick=()=>{ inp.value=clampInt((inp.value===""?0:+inp.value)-10); validateRound(); }; r.append(lab,inp,minus); rows.appendChild(r);
-    const chip=document.createElement("label"); chip.className="cut-chip"; chip.innerHTML=`<input class="visually-hidden" type="radio" name="cutter" value="${p.id}"><span>✂️ ${p.name}</span>`; chip.querySelector("input").addEventListener("change", validateRound); cutters.appendChild(chip);
-  }); const none=document.createElement("label"); none.className="cut-chip"; none.innerHTML=`<input class="visually-hidden" type="radio" name="cutter" value="" checked><span>—</span>`; none.querySelector("input").addEventListener("change", validateRound); cutters.insertBefore(none, cutters.firstChild);
+    const chip=document.createElement("label"); chip.className="cut-chip"; chip.style.cssText="display:inline-flex;align-items:center;gap:8px;border:1px dashed rgba(255,255,255,.2);padding:6px 10px;border-radius:999px;margin:4px 6px 0 0;cursor:pointer;"; chip.innerHTML=`<input class="visually-hidden" type="radio" name="cutter" value="${p.id}"><span>✂️ ${p.name}</span>`; chip.querySelector("input").addEventListener("change", validateRound); cutters.appendChild(chip);
+  }); const none=document.createElement("label"); none.className="cut-chip"; none.style.cssText="display:inline-flex;align-items:center;gap:8px;border:1px dashed rgba(255,255,255,.2);padding:6px 10px;border-radius:999px;margin:4px 6px 0 0;cursor:pointer;"; none.innerHTML=`<input class="visually-hidden" type="radio" name="cutter" value="" checked><span>—</span>`; none.querySelector("input").addEventListener("change", validateRound); cutters.insertBefore(none, cutters.firstChild);
     rErr.style.display="none"; applyBtn.disabled=false; roundDlg.showModal(); };
   const roundInputs=()=>{ const m={}; players.forEach(p=>{ const el=document.getElementById("rr_"+p.id); m[p.id]=clampInt(el?.value??0,0); }); return m; };
   const selectedCutter=()=>{ const sel=document.querySelector('input[name="cutter"]:checked'); const v=sel?sel.value:""; return v||null; };
@@ -395,21 +476,36 @@
   function applyRound(inputs,cid){
     const proj=new Map(); players.forEach(p=>{ proj.set(p.id, clampInt(p.score||0)+clampInt(inputs[p.id]??0)); });
 
-    /* Two-player auto-win: one ≥101 and the other ≤100 */
+    // start round counter & history if cutter selected
+    roundCounter += 1;
+    if (cid){
+      const cutter = players.find(p=>p.id===cid);
+      cutsHistory.push({ id: cid, name: cutter?.name||"—", round: roundCounter, timestamp: Date.now(), result: "played" });
+    }
+
+    /* Two-player auto-win check BEFORE reenganche: one ≥101 and the other ≤100 */
     if(players.length===2){
       const [a,b]=players; const A=proj.get(a.id), B=proj.get(b.id);
-      if(A>=limit+1 && B<=limit){ a.score=A; b.score=B; gameOver=true; document.getElementById("bannerText").textContent=`${b.name} wins`; render(); return; }
-      if(B>=limit+1 && A<=limit){ a.score=A; b.score=B; gameOver=true; document.getElementById("bannerText").textContent=`${a.name} wins`; render(); return; }
+      if(A>=limit+1 && B<=limit){ a.score=A; b.score=B; gameOver=true; showWinOverlay(b); save(); render(); return; }
+      if(B>=limit+1 && A<=limit){ a.score=A; b.score=B; gameOver=true; showWinOverlay(a); save(); render(); return; }
     }
 
     /* Cutter immediate win (strict) */
     if(cid){
       const cProj=proj.get(cid); const ok=cProj<=limit;
       const others=players.filter(p=>p.id!==cid); const allOver=others.every(o=>(proj.get(o.id)??o.score)>limit);
-      if(ok && allOver){ players.forEach(p=>p.score=proj.get(p.id)); gameOver=true; const nm=players.find(p=>p.id===cid)?.name||"—"; document.getElementById("bannerText").textContent=`${nm} ${t("winCut")}`; save(); render(); return; }
+      if(ok && allOver){
+        players.forEach(p=>p.score=proj.get(p.id));
+        gameOver=true;
+        // mark history as cut win
+        const last = cutsHistory.slice().reverse().find(h => h.round===roundCounter && h.id===cid);
+        if (last) last.result="cut_win";
+        showWinOverlay(players.find(p=>p.id===cid));
+        save(); render(); return;
+      }
     }
 
-    /* Reenganche: ANY score ≥101 */
+    /* Reenganche: ANY score ≥101 drops to max <= limit among others */
     players.forEach(p=>{
       let val=proj.get(p.id);
       if(val>=limit+1){
@@ -420,8 +516,17 @@
       }
     });
 
+    // apply totals
     players.forEach(p=>{ p.score=proj.get(p.id); });
+
     if(autoAdvanceDealer) advanceDealer();
+
+    // if cutter existed but no special win, tag as normal cut
+    if (cid){
+      const last = cutsHistory.slice().reverse().find(h => h.round===roundCounter && h.id===cid);
+      if (last && last.result==="played") last.result="normal";
+    }
+
     gameOver=false; render();
   }
 
@@ -429,13 +534,95 @@
   const exportCSV=()=>{ const header=["name","score","reenganches","isDealer"]; const rows=players.map(p=>[csv(p.name), String(clampInt(p.score||0)), String(clampInt(p.reenganches||0)), String(p.id===nextDealerId)]); const all=[header].concat(rows).map(r=>r.join(",")).join("\n"); const blob=new Blob(["\ufeff",all],{type:"text/csv;charset=utf-8"}); const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="conga_scores.csv"; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();},0); };
   const csv=s=>(/[",\n]/.test(s)?`"`+String(s).replace(/"/g,'""')+`"`:String(s));
 
+  /* Win overlay + confetti */
+  const winOverlay=document.getElementById('winOverlay');
+  const winNameEl=document.getElementById('winName');
+  const winPhotoEl=document.getElementById('winPhoto');
+  const winSubEl=document.getElementById('winSubtitle');
+  const winCloseBtn=document.getElementById('winCloseBtn');
+  const winSound=document.getElementById('winSound');
+  const confettiCanvas=document.getElementById('confettiCanvas');
+  let confettiAnim;
+  function showWinOverlay(winner){
+    winNameEl.textContent = `${winner?.name || 'Winner'}`;
+    winSubEl.textContent = (lang==="es"?"Partida terminada":"Game over");
+    winPhotoEl.src = winner?.avatar || 'icons/icon-512.png';
+    winOverlay.style.display='flex';
+    startConfetti();
+    try{winSound.currentTime=0; winSound.play().catch(()=>{});}catch{}
+  }
+  function hideWinOverlay(){ winOverlay.style.display='none'; stopConfetti(); }
+  winCloseBtn.addEventListener('click', hideWinOverlay);
+  winOverlay.addEventListener('click', (e)=>{ if(e.target===winOverlay) hideWinOverlay(); });
+  function startConfetti(){
+    const ctx=confettiCanvas.getContext('2d');
+    const DPR=Math.max(1, window.devicePixelRatio||1);
+    const resize=()=>{ confettiCanvas.width=confettiCanvas.clientWidth*DPR; confettiCanvas.height=confettiCanvas.clientHeight*DPR; };
+    resize(); window.addEventListener('resize', resize);
+    const colors=['#FFD166','#06D6A0','#118AB2','#EF476F','#A78BFA'];
+    const pieces=Array.from({length:120},()=>({x:Math.random()*confettiCanvas.width,y:-Math.random()*confettiCanvas.height,r:2+Math.random()*4,c:colors[Math|Math.random()*colors.length],vx:-1+Math.random()*2,vy:1+Math.random()*2.5,a:Math.random()*Math.PI*2,va:-0.15+Math.random()*0.3}));
+    (function step(){
+      ctx.clearRect(0,0,confettiCanvas.width,confettiCanvas.height);
+      for(const p of pieces){
+        p.x+=p.vx; p.y+=p.vy; p.a+=p.va;
+        if(p.y>confettiCanvas.height+20){ p.y=-10; p.x=Math.random()*confettiCanvas.width; }
+        ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.a); ctx.fillStyle=p.c; ctx.fillRect(-p.r,-p.r,p.r*2,p.r*2); ctx.restore();
+      }
+      confettiAnim=requestAnimationFrame(step);
+    })();
+  }
+  function stopConfetti(){ cancelAnimationFrame(confettiAnim); }
+
+  /* Cropper */
+  const cropDialog=document.getElementById('cropDialog');
+  const cropCanvas=document.getElementById('cropCanvas');
+  const cropCtx=cropCanvas.getContext('2d');
+  const cropZoom=document.getElementById('cropZoom');
+  const cropResetBtn=document.getElementById('cropReset');
+  const cropSaveBtn=document.getElementById('cropSave');
+  let cropImg=new Image(), cropTargetId=null, cx=0, cy=0, scale=1, isPanning=false, lastX=0, lastY=0, pinchStartDist=null, startScale=1;
+  function openCropper(dataUrl, targetId){ cropTargetId=targetId; cropImg=new Image(); cropImg.onload=()=>{ scale=1; cx=0; cy=0; cropZoom.value='1'; drawCrop(); cropDialog.showModal(); }; cropImg.src=dataUrl; }
+  function drawCrop(){
+    const W=cropCanvas.width,H=cropCanvas.height; cropCtx.clearRect(0,0,W,H);
+    cropCtx.save(); cropCtx.translate(W/2+cx, H/2+cy); cropCtx.scale(scale, scale);
+    const ratio=Math.min(W/cropImg.width, H/cropImg.height); const w=cropImg.width*ratio, h=cropImg.height*ratio;
+    cropCtx.drawImage(cropImg, -w/2, -h/2, w, h); cropCtx.restore();
+    cropCtx.save(); cropCtx.fillStyle="rgba(0,0,0,.35)"; cropCtx.beginPath(); cropCtx.rect(0,0,W,H); cropCtx.arc(W/2,H/2,Math.min(W,H)*0.42,0,Math.PI*2,true); cropCtx.fill("evenodd"); cropCtx.restore();
+    cropCtx.beginPath(); cropCtx.strokeStyle="rgba(255,255,255,.85)"; cropCtx.lineWidth=3; cropCtx.arc(W/2,H/2,Math.min(W,H)*0.42,0,Math.PI*2); cropCtx.stroke();
+  }
+  cropCanvas.addEventListener('mousedown', e=>{ isPanning=true; lastX=e.offsetX; lastY=e.offsetY; });
+  window.addEventListener('mouseup', ()=>{ isPanning=false; });
+  cropCanvas.addEventListener('mousemove', e=>{ if(!isPanning) return; cx+=(e.offsetX-lastX); cy+=(e.offsetY-lastY); lastX=e.offsetX; lastY=e.offsetY; drawCrop(); });
+  cropCanvas.addEventListener('touchstart', e=>{ if(e.touches.length===2){ pinchStartDist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY); startScale=scale; } else { isPanning=true; lastX=e.touches[0].clientX; lastY=e.touches[0].clientY; }},{passive:false});
+  cropCanvas.addEventListener('touchmove', e=>{ e.preventDefault(); if(e.touches.length===2 && pinchStartDist){ const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY); scale=Math.min(3,Math.max(0.6, startScale*(d/pinchStartDist))); cropZoom.value=String(scale); drawCrop(); } else if(isPanning){ const x=e.touches[0].clientX,y=e.touches[0].clientY; cx+=(x-lastX); cy+=(y-lastY); lastX=x; lastY=y; drawCrop(); }},{passive:false});
+  cropCanvas.addEventListener('touchend', ()=>{ isPanning=false; pinchStartDist=null; }, {passive:true});
+  cropZoom.addEventListener('input', ()=>{ scale=+cropZoom.value; drawCrop(); });
+  cropResetBtn.addEventListener('click', ()=>{ scale=1; cx=0; cy=0; cropZoom.value='1'; drawCrop(); });
+  cropSaveBtn.addEventListener('click', ()=>{ const W=cropCanvas.width,H=cropCanvas.height; const out=document.createElement('canvas'); const octx=out.getContext('2d'); const R=Math.min(W,H)*0.42; out.width=out.height=R*2; octx.save(); octx.translate(R+cx, R+cy); octx.scale(scale, scale); const ratio=Math.min(W/cropImg.width, H/cropImg.height); const w=cropImg.width*ratio, h=cropImg.height*ratio; octx.beginPath(); octx.arc(0,0,R,0,Math.PI*2); octx.clip(); octx.drawImage(cropImg,-w/2,-h/2,w,h); octx.restore(); const dataURL=out.toDataURL('image/png',0.92); const p=players.find(x=>x.id===cropTargetId); if(p){ p.avatar=dataURL; render(); } cropDialog.close(); });
+
+  /* History dialog */
+  function openHistory(id){
+    const list=$("#historyList"); list.innerHTML="";
+    const my=cutsHistory.filter(h=>h.id===id).sort((a,b)=>a.round-b.round);
+    if(my.length===0){ list.innerHTML='<div class="history-item">No cuts recorded.</div>'; }
+    else{
+      for(const h of my){
+        const d=new Date(h.timestamp);
+        const label=h.result==='cut_win'?'✂️🏆 Cut win':(h.result==='normal'?'✂️ Cut (no win)':'✂️ Cut');
+        const row=document.createElement('div'); row.className='history-item'; row.textContent=`R${h.round} • ${label} • ${d.toLocaleString()}`;
+        list.appendChild(row);
+      }
+    }
+    historyDialog.showModal();
+  }
+
   /* Wire-up */
   document.getElementById("addPlayerBtn").onclick=()=>{ const name=prompt(lang==="es"?"Nombre del jugador:":"Player name?"); if(name!==null) addPlayer(String(name).trim()||undefined); };
   document.getElementById("newRoundBtn").onclick=()=>openRound();
   document.getElementById("exportBtn").onclick=exportCSV;
   document.getElementById("limitInput").oninput=e=>{ const v=clampInt(e.target.value,limit); limit=Math.max(1,v); render(); };
   document.getElementById("autoAdvance").onchange=e=>{ autoAdvanceDealer=!!e.target.checked; render(); };
-  document.getElementById("clearAllBtn").onclick=()=>{ if(confirm(lang==="es"?"¿Limpiar todos los jugadores y ajustes?":"Clear all players and settings?")){ players=[]; limit=100; nextDealerId=null; autoAdvanceDealer=true; gameOver=false; render(); } };
+  document.getElementById("clearAllBtn").onclick=()=>{ if(confirm(lang==="es"?"¿Limpiar todos los jugadores y ajustes?":"Clear all players and settings?")){ players=[]; limit=100; nextDealerId=null; autoAdvanceDealer=true; gameOver=false; cutsHistory=[]; roundCounter=0; render(); } };
   document.getElementById("resetScoresBtn").onclick=()=>{ if(players.length&&confirm(lang==="es"?"¿Reiniciar todos los puntajes y reenganches?":"Reset all scores and reenganches?")){ players.forEach(p=>{p.score=0;p.reenganches=0;}); gameOver=false; render(); } };
   document.getElementById("newGameBtn").onclick=()=>{ players.forEach(p=>{p.score=0;p.reenganches=0;}); gameOver=false; render(); window.scrollTo({top:0,behavior:"smooth"}); };
   document.getElementById("roundForm").onsubmit=e=>{ e.preventDefault(); if(!validateRound()) return; const inputs=roundInputs(); const cid=selectedCutter(); if(cid){ const p=players.find(x=>x.id===cid); const projected=clampInt(p.score||0)+clampInt(inputs[p.id]??0); if(projected>limit){ document.getElementById("roundError").textContent=(I18N[lang].cutterExceeds||I18N.en.cutterExceeds)(limit,projected); document.getElementById("roundError").style.display=""; return; } } roundDlg.close(); applyRound(inputs,cid); };
