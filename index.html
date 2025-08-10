@@ -48,17 +48,17 @@
 
   .players{ margin-top:12px } .players header{ margin:0 0 6px 0; padding:0 6px; color:var(--sub); font-size:12px; }
 
-  /* Row layout: big avatar, protected score column */
+  /* Row layout: give name max space; actions only "Edit" */
   .row{
     display:grid;
-    grid-template-columns: 30px 1fr 84px 108px; /* drag | name+avatar | score | actions */
+    grid-template-columns: 28px 1fr 84px 56px; /* drag | name+avatar | score | edit */
     align-items:center; gap:10px;
     padding:10px; border-radius:14px;
     border:1px solid rgba(255,255,255,.06);
     background: linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,0));
     margin-bottom:8px;
   }
-  @media (min-width:760px){ .row{ grid-template-columns: 34px 1fr 110px 132px; } }
+  @media (min-width:760px){ .row{ grid-template-columns: 32px 1fr 110px 64px; } }
   .drag{ cursor:grab; text-align:center; font-size:18px; color:var(--sub) }
   .row.dealer{ border-color: rgba(78,225,160,.6); box-shadow: 0 0 0 2px rgba(78,225,160,.25) inset; }
 
@@ -69,16 +69,14 @@
   }
   .row.dealer .avatar{ box-shadow: 0 0 0 3px #4ee1a0, 0 0 0 6px rgba(78,225,160,.25); }
   .avatar img{ width:100%; height:100%; object-fit:cover; display:block; }
-  .playerName{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:18px; font-weight:800 }
-  .stars{ color:#ff6b6b; font-size:15px; letter-spacing:.8px; white-space:nowrap }
+  .playerName{ flex:1; min-width:0; overflow:hidden; white-space:normal; line-height:1.15; font-size:18px; font-weight:800; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+  .stars{ color:var(--danger); font-weight:900; font-size:15px; white-space:nowrap } /* one red star + count */
 
   .score{ font-variant-numeric: tabular-nums; font-weight:900; text-align:right; font-size:18px; }
   .score.over{ color:var(--danger) }
 
   .actions{ display:flex; gap:6px; justify-content:flex-end }
   .iconbtn{ width:36px; height:36px; display:grid; place-items:center; border-radius:10px; border:1px solid rgba(255,255,255,.08); background:#0f1428; color:var(--text); cursor:pointer; }
-  .iconbtn.crown{ opacity:.6 } .iconbtn.crown:hover{ opacity:1 }
-  .iconbtn.danger{ background: linear-gradient(135deg, #41141b, #2a0e12); color:#ff9aa8; border-color:rgba(255,0,0,.2) }
 
   .banner{ margin:10px 0; padding:10px 12px; border-radius:14px; border:1px solid rgba(255,255,255,.1);
     background: linear-gradient(90deg, rgba(78,225,160,.15), rgba(122,162,255,.1)); color:#d7fff0; display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; }
@@ -99,7 +97,7 @@
   .hint{ color:var(--sub); font-size:12px }
 
   @media (max-width: 480px){
-    .row{ grid-template-columns: 30px 1fr 74px 96px; gap:8px; }
+    .row{ grid-template-columns: 28px 1fr 74px 56px; gap:8px; }
     .iconbtn{ width:32px; height:32px; }
     .score{ font-size:17px; }
   }
@@ -157,7 +155,7 @@
     </div>
     <div class="dealer-badge">
       <div><strong data-i18n="nextDealer">Next dealer:</strong> <span id="nextDealerName">—</span></div>
-      <div class="hint" data-i18n="dealerHint">Tap and hold the avatar (or use 👑) to set dealer.</div>
+      <div class="hint" data-i18n="dealerHint">Tap and hold the avatar to set dealer (or use the switch in Edit).</div>
     </div>
   </section>
 
@@ -232,7 +230,7 @@
           </div>
         </div>
 
-        <!-- Photo controls and dealer switch -->
+        <!-- Photo controls and dealer/delete -->
         <div style="display:grid; gap:10px; margin-top:8px">
           <div>
             <label>Photo</label>
@@ -246,6 +244,9 @@
             <input id="setDealerSwitch" type="checkbox">
             <span>Set as next dealer</span>
           </label>
+          <div>
+            <button type="button" class="btn warn" id="deletePlayerBtn">Delete player</button>
+          </div>
         </div>
       </div>
     </div>
@@ -320,9 +321,8 @@
     </div>
     <div class="score" aria-label="Score"><span class="scoreVal">0</span></div>
     <div class="actions">
-      <button class="iconbtn crown" title="Set as next dealer" data-role="dealer" aria-label="Set dealer">👑</button>
+      <!-- Only edit button remains in the row -->
       <button class="iconbtn" title="Edit player" data-action="edit" aria-label="Edit player">✎</button>
-      <button class="iconbtn danger" title="Remove player" data-action="remove" aria-label="Remove player">🗑</button>
     </div>
   </div>
 </template>
@@ -336,8 +336,8 @@
 
   /* i18n */
   const I18N = {
-    en:{title:"Scorekeeper",resetScores:"Reset scores",resetTip:"Reset all scores to 0",limitLabel:"Limit (default 100)",autoAdvance:"Auto-advance dealer after round",nextDealer:"Next dealer:",dealerHint:"Tap and hold the avatar (or use 👑) to set dealer.",players:"Players",addPlayer:"+ Add player",gameOver:"Game over",newGame:"New game",newRound:"New round",exportCSV:"Export CSV",clearAll:"Clear all",roundTitle:"New Round",roundHint:"Enter per-player points (negatives allowed). Quick “−10” applies to the input, not the total.",whoCut:"Who cut (cortó)?",optional:"(optional)",close:"Close",cancel:"Cancel",apply:"Apply",editPlayer:"Edit player",name:"Name",score:"Score",reenganches:"Reenganches",save:"Save",winCut:"wins! Cut victory (all others > limit)",cutterInvalid:"Invalid cutter selected.",cutterExceeds:(limit,projected)=>`Cutter cannot exceed ${limit}. (Projected: ${projected})`,player:"Player",current:"Current"},
-    es:{title:"Marcador",resetScores:"Reiniciar puntajes",resetTip:"Poner todos los puntajes en 0",limitLabel:"Límite (por defecto 100)",autoAdvance:"Avanzar repartidor automáticamente después de la ronda",nextDealer:"Próximo repartidor:",dealerHint:"Mantén presionado el avatar (o usa 👑) para marcar repartidor.",players:"Jugadores",addPlayer:"+ Agregar jugador",gameOver:"Partida terminada",newGame:"Nueva partida",newRound:"Nueva ronda",exportCSV:"Exportar CSV",clearAll:"Limpiar todo",roundTitle:"Nueva ronda",roundHint:"Ingresa los puntos por jugador (se permiten negativos). “−10” aplica al campo, no al total.",whoCut:"¿Quién cortó?",optional:"(opcional)",close:"Cerrar",cancel:"Cancelar",apply:"Aplicar",editPlayer:"Editar jugador",name:"Nombre",score:"Puntaje",reenganches:"Reenganches",save:"Guardar",winCut:"¡gana! Corte con victoria (los demás > límite)",cutterInvalid:"Cortador inválido.",cutterExceeds:(limit,projected)=>`El cortador no puede pasar de ${limit}. (Proyectado: ${projected})`,player:"Jugador",current:"Actual"}
+    en:{title:"Scorekeeper",resetScores:"Reset scores",resetTip:"Reset all scores to 0",limitLabel:"Limit (default 100)",autoAdvance:"Auto-advance dealer after round",nextDealer:"Next dealer:",dealerHint:"Tap and hold the avatar to set dealer (or use the switch in Edit).",players:"Players",addPlayer:"+ Add player",gameOver:"Game over",newGame:"New game",newRound:"New round",exportCSV:"Export CSV",clearAll:"Clear all",roundTitle:"New Round",roundHint:"Enter per-player points (negatives allowed). Quick “−10” applies to the input, not the total.",whoCut:"Who cut (cortó)?",optional:"(optional)",close:"Close",cancel:"Cancel",apply:"Apply",editPlayer:"Edit player",name:"Name",score:"Score",reenganches:"Reenganches",save:"Save",winCut:"wins! Cut victory (all others > limit)",cutterInvalid:"Invalid cutter selected.",cutterExceeds:(limit,projected)=>`Cutter cannot exceed ${limit}. (Projected: ${projected})`,player:"Player",current:"Current",delete:"Delete player",confirmDelete:"Delete this player? This cannot be undone."},
+    es:{title:"Marcador",resetScores:"Reiniciar puntajes",resetTip:"Poner todos los puntajes en 0",limitLabel:"Límite (por defecto 100)",autoAdvance:"Avanzar repartidor automáticamente después de la ronda",nextDealer:"Próximo repartidor:",dealerHint:"Mantén presionado el avatar para marcar repartidor (o usa el switch en Editar).",players:"Jugadores",addPlayer:"+ Agregar jugador",gameOver:"Partida terminada",newGame:"Nueva partida",newRound:"Nueva ronda",exportCSV:"Exportar CSV",clearAll:"Limpiar todo",roundTitle:"Nueva ronda",roundHint:"Ingresa los puntos por jugador (se permiten negativos). “−10” aplica al campo, no al total.",whoCut:"¿Quién cortó?",optional:"(opcional)",close:"Cerrar",cancel:"Cancelar",apply:"Aplicar",editPlayer:"Editar jugador",name:"Nombre",score:"Puntaje",reenganches:"Reenganches",save:"Guardar",winCut:"¡gana! Corte con victoria (los demás > límite)",cutterInvalid:"Cortador inválido.",cutterExceeds:(limit,projected)=>`El cortador no puede pasar de ${limit}. (Proyectado: ${projected})`,player:"Jugador",current:"Actual",delete:"Eliminar jugador",confirmDelete:"¿Eliminar este jugador? Esta acción no se puede deshacer."}
   };
   const LangKey="conga_lang";
   const detectLang=()=>{const s=localStorage.getItem(LangKey); if(s&&I18N[s]) return s; return (navigator.language||"en").toLowerCase().startsWith("es")?"es":"en";};
@@ -346,12 +346,9 @@
   const applyI18n=()=>{document.documentElement.lang=lang; document.querySelectorAll("[data-i18n]").forEach(el=>{el.textContent=t(el.getAttribute("data-i18n"));}); document.querySelectorAll("[data-i18n-title]").forEach(el=>{el.title=t(el.getAttribute("data-i18n-title"));}); document.getElementById("langToggle").textContent=(lang==="es"?"EN":"ES");};
 
   /* State */
-  const storageKey="conga_state_final_v1";
+  const storageKey="conga_state_final_v2";
   let players=[], limit=100, nextDealerId=null, autoAdvanceDealer=true, gameOver=false;
-
-  /* Cut history (simple) */
-  let cutsHistory=[]; // [{id,name,round,timestamp,result}]
-  let roundCounter=0;
+  let cutsHistory=[]; let roundCounter=0;
 
   /* Utils */
   const $=s=>document.querySelector(s);
@@ -375,25 +372,23 @@
       n.addEventListener("dragstart",dragStart); n.addEventListener("dragover",dragOver); n.addEventListener("drop",drop); n.addEventListener("dragend",dragEnd);
       if(p.id===nextDealerId) n.classList.add("dealer");
 
-      // name/visuals
       const avatarBox=n.querySelector(".avatar");
       const init=avatarBox.querySelector(".initials");
       init.textContent=initials(p.name);
       if(p.avatar){ avatarBox.innerHTML=`<img alt="" src="${p.avatar}">`; }
-      // long-press avatar to set dealer
       attachLongPress(avatarBox, ()=>setDealer(p.id));
 
-      n.querySelector(".playerName").textContent=p.name;
-      n.querySelector(".stars").textContent="★".repeat(Math.max(0,p.reenganches||0));
+      const nameEl=n.querySelector(".playerName"); nameEl.textContent=p.name;
 
-      // score
+      // ⭐ + count
+      const sEl=n.querySelector(".stars");
+      const r = clampInt(p.reenganches||0,0);
+      sEl.textContent = r>0 ? (r===1 ? "★" : `★ ${r}`) : "";
+
       const sv=n.querySelector(".scoreVal"); sv.textContent=clampInt(p.score||0);
       if((p.score||0)>limit) n.querySelector(".score").classList.add("over"); else n.querySelector(".score").classList.remove("over");
 
-      // actions
-      n.querySelector('[data-role="dealer"]').onclick=()=>setDealer(p.id);
       n.querySelector('[data-action="edit"]').onclick=()=>openEdit(p.id);
-      n.querySelector('[data-action="remove"]').onclick=()=>removePlayer(p.id);
 
       list.appendChild(n);
     });
@@ -451,6 +446,9 @@
     document.getElementById("changePhotoBtn").onclick = ()=>{ photoTarget=p.id; photoInput.value=""; photoInput.click(); };
     document.getElementById("removePhotoBtn").onclick = ()=>{ p.avatar=null; render(); };
     document.getElementById("viewHistoryBtn").onclick = ()=> openHistory(p.id);
+    document.getElementById("deletePlayerBtn").onclick = ()=>{
+      if(confirm(t("confirmDelete"))){ editDlg.close(); removePlayer(p.id); }
+    };
     editDlg.showModal();
   }
   editForm.addEventListener("submit", (e)=>{
@@ -476,14 +474,13 @@
   function applyRound(inputs,cid){
     const proj=new Map(); players.forEach(p=>{ proj.set(p.id, clampInt(p.score||0)+clampInt(inputs[p.id]??0)); });
 
-    // start round counter & history if cutter selected
     roundCounter += 1;
     if (cid){
       const cutter = players.find(p=>p.id===cid);
       cutsHistory.push({ id: cid, name: cutter?.name||"—", round: roundCounter, timestamp: Date.now(), result: "played" });
     }
 
-    /* Two-player auto-win check BEFORE reenganche: one ≥101 and the other ≤100 */
+    /* Two-player auto-win BEFORE reenganche */
     if(players.length===2){
       const [a,b]=players; const A=proj.get(a.id), B=proj.get(b.id);
       if(A>=limit+1 && B<=limit){ a.score=A; b.score=B; gameOver=true; showWinOverlay(b); save(); render(); return; }
@@ -497,7 +494,6 @@
       if(ok && allOver){
         players.forEach(p=>p.score=proj.get(p.id));
         gameOver=true;
-        // mark history as cut win
         const last = cutsHistory.slice().reverse().find(h => h.round===roundCounter && h.id===cid);
         if (last) last.result="cut_win";
         showWinOverlay(players.find(p=>p.id===cid));
@@ -505,7 +501,7 @@
       }
     }
 
-    /* Reenganche: ANY score ≥101 drops to max <= limit among others */
+    /* Reenganche: ANY score ≥101 */
     players.forEach(p=>{
       let val=proj.get(p.id);
       if(val>=limit+1){
@@ -516,12 +512,10 @@
       }
     });
 
-    // apply totals
     players.forEach(p=>{ p.score=proj.get(p.id); });
 
     if(autoAdvanceDealer) advanceDealer();
 
-    // if cutter existed but no special win, tag as normal cut
     if (cid){
       const last = cutsHistory.slice().reverse().find(h => h.round===roundCounter && h.id===cid);
       if (last && last.result==="played") last.result="normal";
@@ -603,7 +597,7 @@
   /* History dialog */
   function openHistory(id){
     const list=$("#historyList"); list.innerHTML="";
-    const my=cutsHistory.filter(h=>h.id===id).sort((a,b)=>a.round-b.round);
+    const my=(cutsHistory||[]).filter(h=>h.id===id).sort((a,b)=>a.round-b.round);
     if(my.length===0){ list.innerHTML='<div class="history-item">No cuts recorded.</div>'; }
     else{
       for(const h of my){
