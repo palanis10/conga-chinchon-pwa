@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Conga / Chinchón – Alanis Scorekeeper</title>
+
+<!-- PWA + iOS -->
+<meta name="theme-color" content="#0f1220" />
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="icons/icon-512.png">
+<link rel="manifest" href="manifest.webmanifest">
+
+<style>
+  :root{
+    --bg:#0f1220; --card:#171a2b; --muted:#2a2f4a; --text:#e8ecff; --sub:#b8c0ff;
+    --accent:#7aa2ff; --accent-2:#4ee1a0; --danger:#ff6b6b; --warn:#ffb020;
+    --shadow: 0 8px 24px rgba(0,0,0,.35); --radius:16px;
+  }
+  *{box-sizing:border-box} html,body{height:100%}
+  body{margin:0; font-family: ui-sans-serif, -apple-system, Segoe UI, Roboto, Arial, Noto Sans, sans-serif;
+    background: radial-gradient(1200px 800px at 20% -10%, #162040, #0d1020 60%) fixed, var(--bg);
+    color:var(--text); -webkit-font-smoothing:antialiased; line-height:1.35;}
+  .app{max-width:980px; margin:0 auto; padding:18px 14px 120px;}
+  header{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px;}
+  .title{font-weight:800; letter-spacing:.3px; font-size: clamp(18px, 4.5vw, 28px); display:flex; align-items:center; gap:10px;}
+  .chip{background:linear-gradient(135deg, var(--accent), #a77dff); color:#0b0f1f; padding:4px 10px; border-radius:999px; font-weight:800; font-size:12px; text-transform:uppercase; letter-spacing:.6px;}
+  .brand{opacity:.9; font-weight:800;}
+  .btn{appearance:none; border:0; cursor:pointer; user-select:none; padding:10px 14px; border-radius:12px;
+    background: linear-gradient(135deg, #1a2344, #121a34); border:1px solid rgba(255,255,255,.08);
+    color:var(--text); font-weight:700; letter-spacing:.2px; transition:.15s;}
+  .btn:hover{ filter:brightness(1.07)} .btn:active{ transform:translateY(1px)}
+  .btn.primary{background: linear-gradient(135deg, var(--accent), #9f7cff); color:#0b0f1f;}
+  .btn.success{background: linear-gradient(135deg, var(--accent-2), #9cffc8); color:#001c12;}
+  .btn.warn{background: linear-gradient(135deg, #ffb020, #ffd27a); color:#2d1500;}
+  .btn.ghost{background: transparent; border:1px dashed rgba(255,255,255,.2);}
+  .card{background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.0)) , var(--card);
+    border:1px solid rgba(255,255,255,.06); border-radius: var(--radius); box-shadow: var(--shadow); padding:12px;}
+
+  .settings{display:grid; grid-template-columns: 1fr; gap:10px;}
+  @media (min-width:680px){ .settings{grid-template-columns: 1.1fr .9fr 1fr;} }
+  label{font-size:12px; color:var(--sub); display:block; margin-bottom:6px}
+  input[type="number"], input[type="text"]{width:100%; background:#0f1428; border:1px solid var(--muted);
+    color:var(--text); padding:10px 12px; border-radius:12px; outline:none;}
+  input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0;}
+  .switch{display:flex; align-items:center; gap:10px; background:#0f1428; border:1px solid var(--muted); padding:10px 12px; border-radius:12px; height:42px;}
+
+  .players{ margin-top:12px } .players header{ margin:0 0 6px 0; padding:0 6px; color:var(--sub); font-size:12px; }
+
+  /* compact row = more name space */
+  .row{
+    display:grid;
+    grid-template-columns: 26px 1fr 84px 110px; /* drag | name | score | actions */
+    align-items:center; gap:10px;
+    padding:10px; border-radius:14px;
+    border:1px solid rgba(255,255,255,.06);
+    background: linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,0));
+    margin-bottom:8px;
+  }
+  @media (min-width:760px){ .row{ grid-template-columns: 30px 1fr 110px 140px; } }
+  .drag{ cursor:grab; text-align:center; font-size:18px; color:var(--sub) }
+  .row.dealer{ border-color: rgba(122,162,255,.4); background: linear-gradient(180deg, rgba(122,162,255,.08), rgba(255,255,255,0)); }
+
+  .name{ display:flex; align-items:center; gap:10px; min-width:0; flex:1; }
+  .avatar{
+    width:34px; height:34px; border-radius:50%; flex:0 0 auto; display:grid; place-items:center;
+    background:#0f1428; border:1px solid rgba(255,255,255,.14); overflow:hidden; font-weight:800;
+  }
+  .avatar img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .name strong{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:15px }
+  .stars{ color:#ff6b6b; font-size:14px; letter-spacing:.8px; white-space:nowrap } /* red star(s) indicate reenganches */
+
+  .score{ font-variant-numeric: tabular-nums; font-weight:900; text-align:right; font-size:18px; }
+  .score.over{ color:var(--danger) }
+
+  .row .actions{ display:flex; gap:6px; justify-content:flex-end }
+  .iconbtn{ width:36px; height:36px; display:grid; place-items:center; border-radius:10px; border:1px solid rgba(255,255,255,.08); background:#0f1428; color:var(--text); cursor:pointer; }
+  .iconbtn[data-role="dealer"]{ background:linear-gradient(135deg, var(--accent), #9f7cff); color:#0b0f1f; font-weight:900 }
+  .iconbtn.danger{ background: linear-gradient(135deg, #41141b, #2a0e12); color:#ff9aa8; border-color:rgba(255,0,0,.2) }
+
+  .banner{ margin:10px 0; padding:10px 12px; border-radius:14px; border:1px solid rgba(255,255,255,.1);
+    background: linear-gradient(90deg, rgba(78,225,160,.15), rgba(122,162,255,.1)); color:#d7fff0; display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; }
+  .banner .tag{ background:#0f1428; border:1px solid rgba(255,255,255,.08); padding:4px 8px; border-radius:999px; font-size:12px; color:#b8c0ff }
+
+  dialog{ width:min(720px, 96vw); border-radius:16px; border:1px solid rgba(255,255,255,.12);
+    background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01)) , #0f1428; color:var(--text);
+    box-shadow: 0 24px 64px rgba(0,0,0,.55); }
+  dialog::backdrop{ background: rgba(2,6,23,.55) }
+  .modal-head{ padding:14px 16px; border-bottom:1px solid rgba(255,255,255,.08); display:flex; align-items:center; justify-content:space-between; gap:10px }
+  .modal-body{ padding:14px 16px } .modal-foot{ padding:14px 16px; border-top:1px solid rgba(255,255,255,.08); display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap }
+  .grid-rows{ display:grid; gap:8px }
+  .round-row{ display:grid; grid-template-columns: 1fr 120px 70px; gap:10px; align-items:center; padding:8px; border:1px dashed rgba(255,255,255,.15); border-radius:12px;
+    background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.00)); }
+  .round-row .minus10{ width:100%; height:40px; border-radius:10px; border:1px solid rgba(255,255,255,.12); background:linear-gradient(135deg, #1c243e, #121a34); color:var(--text); font-weight:800; }
+
+  .error{ color:var(--danger); font-weight:700; margin-right:auto }
+  .hint{ color:var(--sub); font-size:12px }
+
+  @media (max-width: 480px){
+    .row{ grid-template-columns: 26px 1fr 72px 94px; gap:8px; }
+    .iconbtn{ width:32px; height:32px; }
+    .score{ font-size:17px; }
+  }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header>
+    <div class="title">
+      <span class="chip">Conga / Chinchón</span>
+      <span class="brand">Alanis Scorekeeper</span>
+    </div>
+    <div class="lang">
+      <button class="btn ghost" id="resetScoresBtn" title="Reset all scores to 0" data-i18n-title="resetTip" data-i18n="resetScores">Reset scores</button>
+      <button class="btn" id="langToggle" title="Cambiar idioma / Change language">ES</button>
+    </div>
+  </header>
+
+  <section class="card settings" aria-label="Game settings">
+    <div>
+      <label for="limitInput" data-i18n="limitLabel">Limit (default 100)</label>
+      <input id="limitInput" type="number" inputmode="numeric" min="1" step="1" />
+    </div>
+    <div class="switch" role="group" aria-label="Auto advance dealer">
+      <input id="autoAdvance" type="checkbox" />
+      <label for="autoAdvance" style="margin:0" data-i18n="autoAdvance">Auto-advance dealer after round</label>
+    </div>
+    <div class="dealer-badge">
+      <div><strong data-i18n="nextDealer">Next dealer:</strong> <span id="nextDealerName">—</span></div>
+      <div class="hint" data-i18n="dealerHint">Tap the purple “D” on a player to set them as dealer.</div>
+    </div>
+  </section>
+
+  <section class="players">
+    <header><div data-i18n="players">Players</div></header>
+    <div id="playersList" aria-live="polite"></div>
+    <button class="btn ghost" id="addPlayerBtn" style="width:100%; margin-top:6px" data-i18n="addPlayer">+ Add player</button>
+  </section>
+
+  <section id="banner" class="banner" style="display:none" aria-live="polite">
+    <div><strong id="bannerText"></strong></div>
+    <div class="tag" data-i18n="gameOver">Game over</div>
+    <div style="margin-left:auto; display:flex; gap:8px">
+      <button class="btn success" id="newGameBtn" data-i18n="newGame">New game</button>
+    </div>
+  </section>
+
+  <section class="card toolbar" aria-label="Actions">
+    <button class="btn primary" id="newRoundBtn" data-i18n="newRound">New round</button>
+    <button class="btn" id="exportBtn" title="Download CSV" data-i18n="exportCSV">Export CSV</button>
+    <button class="btn warn" id="clearAllBtn" title="Remove all players and settings" data-i18n="clearAll">Clear all</button>
+  </section>
+</div>
+
+<!-- Round dialog -->
+<dialog id="roundDialog" aria-labelledby="roundTitle">
+  <div class="modal-head">
+    <div>
+      <div id="roundTitle" style="font-weight:800" data-i18n="roundTitle">New Round</div>
+      <div class="hint" data-i18n="roundHint">Enter per-player points (negatives allowed). Quick “−10” applies to the input, not the total.</div>
+    </div>
+    <button class="btn ghost" onclick="roundDialog.close()" data-i18n="close">Close</button>
+  </div>
+  <form id="roundForm" method="dialog">
+    <div class="modal-body">
+      <div class="grid-rows" id="roundRows"></div>
+      <div style="margin-top:10px">
+        <label style="margin-bottom:8px; display:block"><strong data-i18n="whoCut">Who cut (cortó)?</strong> <span class="hint" data-i18n="optional">(optional)</span></label>
+        <div class="cutters" id="cuttersGroup" role="radiogroup" aria-label="Cutter select"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <div id="roundError" class="error" style="display:none"></div>
+      <button type="button" class="btn ghost" onclick="roundDialog.close()" data-i18n="cancel">Cancel</button>
+      <button id="applyRoundBtn" type="submit" class="btn success" data-i18n="apply">Apply</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Edit player dialog -->
+<dialog id="editDialog" aria-labelledby="editTitle">
+  <div class="modal-head">
+    <div id="editTitle" style="font-weight:800" data-i18n="editPlayer">Edit player</div>
+    <button class="btn ghost" onclick="editDialog.close()" data-i18n="close">Close</button>
+  </div>
+  <form id="editForm" method="dialog">
+    <div class="modal-body">
+      <input type="hidden" id="editId" />
+      <div style="display:grid; gap:10px">
+        <div>
+          <label for="editName" data-i18n="name">Name</label>
+          <input id="editName" type="text" required />
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px">
+          <div>
+            <label for="editScore" data-i18n="score">Score</label>
+            <input id="editScore" type="number" step="1" />
+          </div>
+          <div>
+            <label for="editReeng" data-i18n="reenganches">Reenganches</label>
+            <input id="editReeng" type="number" step="1" min="0" />
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" type="button" onclick="editDialog.close()" data-i18n="cancel">Cancel</button>
+      <button class="btn success" type="submit" data-i18n="save">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Row template -->
+<template id="playerRowTpl">
+  <div class="row" draggable="true" aria-grabbed="false">
+    <div class="drag" title="Drag to reorder" aria-hidden="true">≡</div>
+    <div class="name">
+      <div class="avatar" aria-hidden="true"><span class="initials"></span></div>
+      <strong class="playerName"></strong>
+      <span class="stars" aria-label="Reenganches"></span>
+    </div>
+    <div class="score" aria-label="Score"><span class="scoreVal">0</span></div>
+    <div class="actions">
+      <button class="iconbtn" title="Set as next dealer" data-role="dealer" aria-label="Set as next dealer">D</button>
+      <button class="iconbtn" title="Set photo" data-action="photo" aria-label="Set photo">📷</button>
+      <button class="iconbtn" title="Edit player" data-action="edit" aria-label="Edit player">✎</button>
+      <button class="iconbtn danger" title="Remove player" data-action="remove" aria-label="Remove player">🗑</button>
+    </div>
+  </div>
+</template>
+
+<input id="photoInput" type="file" accept="image/*" capture="environment" hidden>
+
+<script>
+(() => {
+  "use strict";
+
+  /* i18n */
+  const I18N = {
+    en:{title:"Scorekeeper",resetScores:"Reset scores",resetTip:"Reset all scores to 0",limitLabel:"Limit (default 100)",autoAdvance:"Auto-advance dealer after round",nextDealer:"Next dealer:",dealerHint:"Tap the purple “D” on a player to set them as dealer.",players:"Players",addPlayer:"+ Add player",gameOver:"Game over",newGame:"New game",newRound:"New round",exportCSV:"Export CSV",clearAll:"Clear all",roundTitle:"New Round",roundHint:"Enter per-player points (negatives allowed). Quick “−10” applies to the input, not the total.",whoCut:"Who cut (cortó)?",optional:"(optional)",close:"Close",cancel:"Cancel",apply:"Apply",editPlayer:"Edit player",name:"Name",score:"Score",reenganches:"Reenganches",save:"Save",winCut:"wins! Cut victory (all others > limit)",cutterInvalid:"Invalid cutter selected.",cutterExceeds:(limit,projected)=>`Cutter cannot exceed ${limit}. (Projected: ${projected})`,player:"Player",current:"Current"},
+    es:{title:"Marcador",resetScores:"Reiniciar puntajes",resetTip:"Poner todos los puntajes en 0",limitLabel:"Límite (por defecto 100)",autoAdvance:"Avanzar repartidor automáticamente después de la ronda",nextDealer:"Próximo repartidor:",dealerHint:"Toca la “D” morada junto al jugador para marcarlo como repartidor.",players:"Jugadores",addPlayer:"+ Agregar jugador",gameOver:"Partida terminada",newGame:"Nueva partida",newRound:"Nueva ronda",exportCSV:"Exportar CSV",clearAll:"Limpiar todo",roundTitle:"Nueva ronda",roundHint:"Ingresa los puntos por jugador (se permiten negativos). “−10” aplica al campo, no al total.",whoCut:"¿Quién cortó?",optional:"(opcional)",close:"Cerrar",cancel:"Cancelar",apply:"Aplicar",editPlayer:"Editar jugador",name:"Nombre",score:"Puntaje",reenganches:"Reenganches",save:"Guardar",winCut:"¡gana! Corte con victoria (los demás > límite)",cutterInvalid:"Cortador inválido.",cutterExceeds:(limit,projected)=>`El cortador no puede pasar de ${limit}. (Proyectado: ${projected})`,player:"Jugador",current:"Actual"}
+  };
+  const LangKey="conga_lang";
+  const detectLang=()=>{const s=localStorage.getItem(LangKey); if(s&&I18N[s]) return s; return (navigator.language||"en").toLowerCase().startsWith("es")?"es":"en";};
+  let lang=detectLang();
+  const t=(k)=> (typeof I18N[lang][k]==="string")?I18N[lang][k]:(I18N.en[k]||k);
+  const applyI18n=()=>{document.documentElement.lang=lang; document.querySelectorAll("[data-i18n]").forEach(el=>{el.textContent=t(el.getAttribute("data-i18n"));}); document.querySelectorAll("[data-i18n-title]").forEach(el=>{el.title=t(el.getAttribute("data-i18n-title"));}); document.getElementById("langToggle").textContent=(lang==="es"?"EN":"ES");};
+
+  /* State */
+  const storageKey="conga_state_clean_v1";
+  let players=[], limit=100, nextDealerId=null, autoAdvanceDealer=true, gameOver=false;
+
+  /* Utils */
+  const $=s=>document.querySelector(s);
+  const uid=()=> "p"+Math.random().toString(36).slice(2)+Date.now().toString(36);
+  const clampInt=(v,d=0)=>Number.isFinite(+v)?Math.trunc(+v):d;
+  const initials=(n)=> (n||" ").trim().split(/\s+/).map(s=>s[0]).join("").slice(0,2).toUpperCase();
+
+  const save=()=>{localStorage.setItem(storageKey, JSON.stringify({players,limit,nextDealerId,autoAdvanceDealer,gameOver})); localStorage.setItem(LangKey,lang);};
+  const load=()=>{try{const s=JSON.parse(localStorage.getItem(storageKey)||"{}"); players=s.players||[]; limit=Number.isFinite(s.limit)?s.limit:100; nextDealerId=(typeof s.nextDealerId==="string")?s.nextDealerId:(players[0]?.id??null); autoAdvanceDealer=!!s.autoAdvanceDealer; gameOver=!!s.gameOver;}catch{} const L=localStorage.getItem(LangKey); if(L&&I18N[L]) lang=L;};
+
+  /* Render */
+  const list=$("#playersList"), rowTpl=document.getElementById("playerRowTpl");
+  function render(){
+    $("#limitInput").value=limit; $("#autoAdvance").checked=autoAdvanceDealer;
+    $("#nextDealerName").textContent=players.find(p=>p.id===nextDealerId)?.name||"—";
+    $("#banner").style.display=gameOver?"":"none";
+    list.innerHTML="";
+    players.forEach((p,i)=>{
+      const n=rowTpl.content.firstElementChild.cloneNode(true);
+      n.dataset.index=i; n.dataset.id=p.id;
+      n.addEventListener("dragstart",dragStart); n.addEventListener("dragover",dragOver); n.addEventListener("drop",drop); n.addEventListener("dragend",dragEnd);
+      if(p.id===nextDealerId) n.classList.add("dealer");
+      n.querySelector(".playerName").textContent=p.name;
+      n.querySelector(".stars").textContent="★".repeat(Math.max(0,p.reenganches||0));
+      const av=n.querySelector(".avatar"); const init=av.querySelector(".initials"); init.textContent=initials(p.name); if(p.avatar){ av.innerHTML=`<img alt="" src="${p.avatar}">`; }
+      const sv=n.querySelector(".scoreVal"); sv.textContent=clampInt(p.score||0); if((p.score||0)>limit) n.querySelector(".score").classList.add("over"); else n.querySelector(".score").classList.remove("over");
+      n.querySelector('[data-role="dealer"]').onclick=()=>setDealer(p.id);
+      n.querySelector('[data-action="edit"]').onclick=()=>openEdit(p.id);
+      n.querySelector('[data-action="remove"]').onclick=()=>removePlayer(p.id);
+      n.querySelector('[data-action="photo"]').onclick=()=>photo(p.id);
+      list.appendChild(n);
+    });
+    $("#newRoundBtn").disabled=players.length===0||gameOver; $("#exportBtn").disabled=players.length===0; $("#resetScoresBtn").disabled=players.length===0;
+    applyI18n(); save();
+  }
+
+  /* Drag & drop */
+  let dragIdx=null;
+  const dragStart=e=>{dragIdx=+e.currentTarget.dataset.index; e.dataTransfer.effectAllowed="move"; e.dataTransfer.setData("text/plain", String(dragIdx)); e.currentTarget.setAttribute("aria-grabbed","true");};
+  const dragOver=e=>{e.preventDefault(); e.dataTransfer.dropEffect="move";};
+  const drop=e=>{e.preventDefault(); const from=dragIdx??+e.dataTransfer.getData("text/plain"); const to=+e.currentTarget.dataset.index; if(Number.isInteger(from)&&Number.isInteger(to)&&from!==to){ const arr=players.slice(); const [m]=arr.splice(from,1); arr.splice(to,0,m); const keep=nextDealerId; players=arr; nextDealerId=keep; render(); }};
+  const dragEnd=e=>{e.currentTarget.setAttribute("aria-grabbed","false"); dragIdx=null;};
+
+  /* Dealer */
+  const setDealer=id=>{ if(players.some(p=>p.id===id)){ nextDealerId=id; render(); } };
+  const advanceDealer=()=>{ if(!players.length||!nextDealerId) return; const i=players.findIndex(p=>p.id===nextDealerId); nextDealerId=players[(i>=0&&i<players.length-1)?i+1:0].id; };
+
+  /* CRUD */
+  const addPlayer=(name="")=>{ const p={id:uid(), name:name||`${t("player")} ${players.length+1}`, score:0, reenganches:0, avatar:null}; players.push(p); if(!nextDealerId) nextDealerId=p.id; gameOver=false; render(); };
+  const removePlayer=id=>{ const i=players.findIndex(p=>p.id===id); if(i<0) return; const was=players[i].id===nextDealerId; players.splice(i,1); if(!players.length) nextDealerId=null; else if(was) nextDealerId=players[Math.min(i,players.length-1)].id; render(); };
+
+  /* Photo / camera */
+  const input=document.getElementById("photoInput"); let photoTarget=null;
+  const photo=id=>{ photoTarget=id; input.value=""; input.click(); };
+  input.addEventListener("change", async()=>{ if(!photoTarget||!input.files?.[0]) return; const f=input.files[0]; const url=await new Promise((res,rej)=>{const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=rej; r.readAsDataURL(f);}); const p=players.find(x=>x.id===photoTarget); if(p){ p.avatar=url; render(); } photoTarget=null; });
+
+  /* Edit dialog */
+  const editDlg=document.getElementById("editDialog"), editForm=document.getElementById("editForm");
+  const openEdit=id=>{ const p=players.find(x=>x.id===id); if(!p) return; document.getElementById("editId").value=p.id; document.getElementById("editName").value=p.name; document.getElementById("editScore").value=clampInt(p.score||0); document.getElementById("editReeng").value=clampInt(p.reenganches||0); editDlg.showModal(); };
+  editForm.addEventListener("submit",e=>{ e.preventDefault(); const id=document.getElementById("editId").value; const p=players.find(x=>x.id===id); if(!p) return editDlg.close(); p.name=String(document.getElementById("editName").value||"").trim()||p.name; p.score=clampInt(document.getElementById("editScore").value,p.score); p.reenganches=Math.max(0,clampInt(document.getElementById("editReeng").value,p.reenganches)); editDlg.close(); render(); });
+
+  /* Round modal + logic */
+  const roundDlg=document.getElementById("roundDialog"), rows=document.getElementById("roundRows"), cutters=document.getElementById("cuttersGroup"), rErr=document.getElementById("roundError"), applyBtn=document.getElementById("applyRoundBtn");
+  const openRound=()=>{ rows.innerHTML=""; cutters.innerHTML=""; players.forEach(p=>{ const r=document.createElement("div"); r.className="round-row"; const lab=document.createElement("label"); lab.setAttribute("for","rr_"+p.id); lab.innerHTML=`<strong>${p.name}</strong><div class="hint">${t("current")}: ${p.score}</div>`; const inp=document.createElement("input"); inp.id="rr_"+p.id; inp.type="number"; inp.step="1"; inp.inputMode="numeric"; inp.placeholder="0"; inp.dataset.pid=p.id; inp.addEventListener("input", validateRound); const minus=document.createElement("button"); minus.type="button"; minus.className="minus10"; minus.textContent="−10"; minus.onclick=()=>{ inp.value=clampInt((inp.val
