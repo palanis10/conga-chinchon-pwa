@@ -18,41 +18,61 @@
     --shadow: 0 8px 24px rgba(0,0,0,.35); --radius:16px;
   }
   *{box-sizing:border-box} html,body{height:100%}
-  body{margin:0; font-family: ui-sans-serif, -apple-system, Segoe UI, Roboto, Arial, Noto Sans, sans-serif;
+  body{
+    margin:0;
+    font-family: ui-sans-serif, -apple-system, Segoe UI, Roboto, Arial, Noto Sans, sans-serif;
     background: radial-gradient(1200px 800px at 20% -10%, #162040, #0d1020 60%) fixed, var(--bg);
-    color:var(--text); -webkit-font-smoothing:antialiased; line-height:1.35;}
-  .app{max-width:980px; margin:0 auto; padding:10px 12px 120px;}
+    color:var(--text); -webkit-font-smoothing:antialiased; line-height:1.35;
+  }
+  .app{max-width:980px; margin:0 auto; padding: calc(8px + env(safe-area-inset-top, 0px)) 12px 120px;}
 
-  /* Top bar */
-  header{display:flex; align-items:center; justify-content:space-between; gap:8px; margin:2px 0 8px 0;}
-  .top-left{display:flex; align-items:center; gap:10px}
-  .chip{background:linear-gradient(135deg, var(--accent), #a77dff); color:#0b0f1f; padding:3px 10px; border-radius:999px; font-weight:800; font-size:11px; text-transform:uppercase; letter-spacing:.6px;}
+  /* Top bar (grid so buttons never fall between title lines) */
+  header.topbar{
+    display:grid; grid-template-columns: 1fr auto; align-items:center; gap:12px;
+    margin:2px 0 8px 0;
+  }
+  .top-left{min-width:0; display:flex; align-items:center; gap:10px}
+  .chip{
+    background:linear-gradient(135deg, var(--accent), #a77dff); color:#0b0f1f;
+    padding:3px 10px; border-radius:999px; font-weight:800; font-size:11px;
+    text-transform:uppercase; letter-spacing:.6px;
+  }
   .brand{opacity:.95; font-weight:900; letter-spacing:.2px; font-size: clamp(16px, 4vw, 22px);}
-  .btn{appearance:none; border:0; cursor:pointer; user-select:none; padding:9px 12px; border-radius:12px;
-    background: linear-gradient(135deg, #1a2344, #121a34); border:1px solid rgba(255,255,255,.08);
-    color:var(--text); font-weight:700; letter-spacing:.2px; transition:.15s;}
+  .top-actions{display:flex; gap:8px; align-items:center}
+
+  .btn{
+    appearance:none; border:0; cursor:pointer; user-select:none; padding:9px 12px; border-radius:12px;
+    background: linear-gradient(135deg, #1a2344, #121a34); border:1px solid rgba(255,255,255,.10);
+    color:var(--text); font-weight:700; letter-spacing:.2px; transition:.15s;
+  }
   .btn:hover{ filter:brightness(1.07)} .btn:active{ transform:translateY(1px)}
   .btn.primary{background: linear-gradient(135deg, var(--accent), #9f7cff); color:#0b0f1f;}
   .btn.success{background: linear-gradient(135deg, var(--accent-2), #9cffc8); color:#001c12;}
   .btn.warn{background: linear-gradient(135deg, #ffb020, #ffd27a); color:#2d1500;}
-  .btn.ghost{background: transparent; border:1px dashed rgba(255,255,255,.2);}
+  .btn.ghost{background: rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.14);}
   .iconbtn{ width:44px; height:44px; display:grid; place-items:center; border-radius:12px; border:1px solid rgba(255,255,255,.12); background:#0f1428; color:var(--text); cursor:pointer; font-size:18px;}
   .card{background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.0)) , var(--card);
     border:1px solid rgba(255,255,255,.06); border-radius: var(--radius); box-shadow: var(--shadow); padding:12px;}
 
   /* Players */
   .players header{ margin:0 0 6px 2px; color:var(--sub); font-size:12px; }
+
+  /* iOS-safe player grid: explicit columns so last cells don't collapse */
   .row{
     display:grid;
-    grid-template-columns: 28px 54px minmax(120px,1fr) auto auto; /* drag | avatar | name | stars+score | edit */
+    grid-template-columns: 44px 54px minmax(0,1fr) minmax(150px,auto) 44px; /* drag | avatar | name | star+score | edit */
     align-items:center; gap:8px;
     padding:8px 10px; border-radius:14px;
     border:1px solid rgba(255,255,255,.06);
     background: linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,0));
-    margin-bottom:10px;
-    min-height: 88px; /* ~15-20% shorter than earlier */
+    margin-bottom:8px;
+    min-height:84px;
+    touch-action:manipulation;
   }
-  .drag{ cursor:grab; text-align:center; font-size:18px; color:var(--sub) }
+  .drag{
+    cursor:grab; text-align:center; font-size:18px; color:var(--sub);
+    width:44px; height:44px; display:grid; place-items:center;
+  }
   .row.dealer{ border-color: rgba(78,225,160,.55); box-shadow: 0 0 0 2px rgba(78,225,160,.22) inset; }
 
   .avatar{
@@ -62,26 +82,22 @@
   .row.dealer .avatar{ box-shadow: 0 0 0 3px #4ee1a0, 0 0 0 6px rgba(78,225,160,.25); }
   .avatar img{ width:100%; height:100%; object-fit:cover; display:block; }
 
-  /* Single-line, bigger names */
   .playerName{
-    min-width:0;
-    white-space:nowrap;
-    overflow:hidden;
-    text-overflow:clip; /* you said names won't exceed ~10 chars */
-    line-height:1.05;
-    font-size: clamp(22px, 5.2vw, 28px);
-    font-weight:900;
-    letter-spacing:.2px;
+    min-width:0; white-space:nowrap; overflow:hidden; text-overflow:clip;
+    line-height:1.05; font-size: clamp(22px, 5.2vw, 28px); font-weight:900; letter-spacing:.2px;
   }
 
   .stars{ color:var(--danger); font-weight:900; font-size:18px; white-space:nowrap; margin-right:6px }
 
-  /* Score area tight to edit */
-  .scorewrap{ display:flex; align-items:center; gap:6px; min-width:150px; justify-content:flex-end; margin-right:4px; }
+  .scorewrap{
+    justify-self:end; display:flex; align-items:center; gap:8px;
+    min-width:150px; /* keeps space for ★ 99 and big scores on Safari */
+    margin-right:4px;
+  }
   .score{ font-variant-numeric: tabular-nums; font-weight:900; text-align:right; font-size: clamp(22px, 5.2vw, 28px); }
-  /* Only turn red when >= limit+1 */
   .score.over{ color:var(--danger) }
-  .actions{ display:flex; gap:4px; justify-content:flex-end }
+
+  .actions{ display:flex; gap:4px; justify-content:flex-end; align-items:center; }
   .actions .iconbtn{ width:40px; height:40px; font-size:16px; }
 
   /* Banner (game over) */
@@ -150,13 +166,13 @@
 <body>
 <div class="app" id="app">
 
-  <!-- Compact header -->
-  <header>
+  <!-- Header -->
+  <header class="topbar">
     <div class="top-left">
       <span class="chip">Conga / Chinchón</span>
       <span class="brand">Alanis Scorekeeper</span>
     </div>
-    <div style="display:flex; gap:8px">
+    <div class="top-actions">
       <button id="historyBtn" class="btn ghost">History</button>
       <button id="newRoundBtn" class="btn primary" data-i18n="newRound">New round</button>
       <button id="openSettings" class="iconbtn" aria-label="Settings">⚙️</button>
@@ -363,7 +379,7 @@
 <!-- Player row template -->
 <template id="playerRowTpl">
   <div class="row" draggable="true" aria-grabbed="false">
-    <div class="drag" title="Drag to reorder" aria-hidden="true">≡</div>
+    <div class="drag" title="Drag to reorder" aria-label="Drag handle">≡</div>
     <div class="avatar" aria-hidden="true"><span class="initials"></span></div>
     <strong class="playerName"></strong>
     <div class="scorewrap">
@@ -401,7 +417,7 @@
   };
 
   /* State */
-  const storageKey="conga_state_ui_rev3";
+  const storageKey="conga_state_ui_rev4";
   let players=[], limit=100, nextDealerId=null, autoAdvanceDealer=true, gameOver=false;
   let cutsHistory=[]; let roundCounter=0; let rounds=[];
 
@@ -439,12 +455,12 @@
     players.forEach((p,i)=>{
       const n=rowTpl.content.firstElementChild.cloneNode(true);
       n.dataset.index=i; n.dataset.id=p.id;
-      n.addEventListener("dragstart",dragStart); 
-      n.addEventListener("dragover",dragOver); 
-      n.addEventListener("drop",drop); 
+      n.addEventListener("dragstart",dragStart);
+      n.addEventListener("dragover",dragOver);
+      n.addEventListener("drop",drop);
       n.addEventListener("dragend",dragEnd);
 
-      // Long-press the whole row to set dealer
+      // Long-press entire row to set dealer
       attachLongPress(n, ()=>setDealer(p.id));
 
       if(p.id===nextDealerId) n.classList.add("dealer"); else n.classList.remove("dealer");
@@ -454,21 +470,17 @@
       init.textContent=initials(p.name||"");
       if(p.avatar){ avatarBox.innerHTML=`<img alt="" src="${p.avatar}">`; }
 
-      // Single-line name, big
       n.querySelector(".playerName").textContent=p.name||"—";
 
-      // Reenganches star
+      // ★ near score
       const sEl=n.querySelector(".stars");
       const r = clampInt(p.reenganches||0,0);
       sEl.textContent = r>0 ? (r===1 ? "★" : `★ ${r}`) : "";
 
-      // Score (red only at >= limit+1)
-      const sv=n.querySelector(".scoreVal"); 
-      sv.textContent=clampInt(p.score||0);
-      const scWrap=n.querySelector(".score"); 
-      if((p.score||0) >= (limit+1)) scWrap.classList.add("over"); else scWrap.classList.remove("over");
+      // Score – red only when >= limit+1
+      const sv=n.querySelector(".scoreVal"); sv.textContent=clampInt(p.score||0);
+      const scWrap=n.querySelector(".score"); if((p.score||0) >= (limit+1)) scWrap.classList.add("over"); else scWrap.classList.remove("over");
 
-      // Edit
       n.querySelector('[data-action="edit"]').onclick=()=>openEdit(p.id);
 
       list.appendChild(n);
@@ -504,7 +516,7 @@
 
   /* Photo + cropper */
   const photoInput=document.getElementById("photoInput"); let photoTarget=null;
-  photoInput.removeAttribute('capture'); // allow camera or library
+  photoInput.removeAttribute('capture');
   photoInput.addEventListener("change", async()=>{
     if(!photoTarget||!photoInput.files?.[0]) return;
     const file=photoInput.files[0];
@@ -633,7 +645,7 @@
   /* CSV */
   const exportCSV=()=>{ const header=["name","score","reenganches","isDealer"]; const rows=players.map(p=>[csv(p.name||""), String(clampInt(p.score||0)), String(clampInt(p.reenganches||0)), String(p.id===nextDealerId)]); const all=[header].concat(rows).map(r=>r.join(",")).join("\n"); const blob=new Blob(["\ufeff",all],{type:"text/csv;charset=utf-8"}); const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="conga_scores.csv"; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();},0); };
 
-  /* Win overlay */
+  /* Win overlay + confetti */
   const winOverlay=document.getElementById('winOverlay');
   const winNameEl=document.getElementById('winName');
   const winPhotoEl=document.getElementById('winPhoto');
@@ -653,24 +665,14 @@
   function hideWinOverlay(){ winOverlay.style.display='none'; cancelAnimationFrame(confettiAnim); }
   winCloseBtn.addEventListener('click', hideWinOverlay);
   winOverlay.addEventListener('click', (e)=>{ if(e.target===winOverlay) hideWinOverlay(); });
-
   function startConfetti(){
     const ctx = confettiCanvas.getContext('2d');
     const DPR = Math.max(1, window.devicePixelRatio||1);
-    const resize = ()=>{ confettiCanvas.width = confettiCanvas.clientWidth*DPR;
-                         confettiCanvas.height = confettiCanvas.clientHeight*DPR; };
+    const resize = ()=>{ confettiCanvas.width = confettiCanvas.clientWidth*DPR; confettiCanvas.height = confettiCanvas.clientHeight*DPR; };
     resize(); window.addEventListener('resize', resize);
-
     const W = ()=>confettiCanvas.width, H = ()=>confettiCanvas.height;
     const colors = ['#FFD166','#06D6A0','#118AB2','#EF476F','#A78BFA','#FF9F1C','#2EC4B6'];
-
-    const confetti = Array.from({length:220},()=>({
-      x: Math.random()*W(), y: -Math.random()*H(), r: 2+Math.random()*4,
-      c: colors[(Math.random()*colors.length)|0],
-      vx: -1 + Math.random()*2, vy: 1 + Math.random()*2.8,
-      a: Math.random()*Math.PI*2, va: -0.2+Math.random()*0.4
-    }));
-
+    const confetti = Array.from({length:220},()=>({ x: Math.random()*W(), y: -Math.random()*H(), r: 2+Math.random()*4, c: colors[(Math.random()*colors.length)|0], vx: -1 + Math.random()*2, vy: 1 + Math.random()*2.8, a: Math.random()*Math.PI*2, va: -0.2+Math.random()*0.4 }));
     (function loop(){
       const w=W(), h=H();
       ctx.clearRect(0,0,w,h);
