@@ -44,42 +44,45 @@
   .players header{ margin:0 0 6px 2px; color:var(--sub); font-size:12px; }
   .row{
     display:grid;
-    grid-template-columns: 28px 52px minmax(120px,1fr) auto auto; /* drag | avatar | NAME | score | edit */
+    grid-template-columns: 28px 54px minmax(120px,1fr) auto auto; /* drag | avatar | name | stars+score | edit */
     align-items:center; gap:8px;
-    padding:10px; border-radius:14px;
+    padding:8px 10px; border-radius:14px;
     border:1px solid rgba(255,255,255,.06);
     background: linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,0));
-    margin-bottom:8px;
+    margin-bottom:10px;
+    min-height: 88px; /* ~15-20% shorter than earlier */
   }
   .drag{ cursor:grab; text-align:center; font-size:18px; color:var(--sub) }
   .row.dealer{ border-color: rgba(78,225,160,.55); box-shadow: 0 0 0 2px rgba(78,225,160,.22) inset; }
 
   .avatar{
-    width:52px; height:52px; border-radius:50%; flex:0 0 auto; display:grid; place-items:center;
+    width:54px; height:54px; border-radius:50%; flex:0 0 auto; display:grid; place-items:center;
     background:#0f1428; border:1px solid rgba(255,255,255,.14); overflow:hidden; font-weight:800;
   }
   .row.dealer .avatar{ box-shadow: 0 0 0 3px #4ee1a0, 0 0 0 6px rgba(78,225,160,.25); }
   .avatar img{ width:100%; height:100%; object-fit:cover; display:block; }
 
-  /* FULL name (no ellipsis), allow wrapping up to 2 lines */
+  /* Single-line, bigger names */
   .playerName{
     min-width:0;
-    white-space:normal;       /* allow wrap */
-    overflow:visible;         /* show full text */
-    word-break:break-word;
-    line-height:1.1;
-    font-size: clamp(20px, 5vw, 26px);
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:clip; /* you said names won't exceed ~10 chars */
+    line-height:1.05;
+    font-size: clamp(22px, 5.2vw, 28px);
     font-weight:900;
     letter-spacing:.2px;
   }
 
-  .stars{ color:var(--danger); font-weight:900; font-size:16px; white-space:nowrap; margin-right:6px }
+  .stars{ color:var(--danger); font-weight:900; font-size:18px; white-space:nowrap; margin-right:6px }
 
-  /* Score tighter to Edit */
-  .scorewrap{ display:flex; align-items:center; gap:2px; min-width:64px; justify-content:flex-end; margin-right:4px;}
-  .score{ font-variant-numeric: tabular-nums; font-weight:900; text-align:right; font-size:18px; }
+  /* Score area tight to edit */
+  .scorewrap{ display:flex; align-items:center; gap:6px; min-width:150px; justify-content:flex-end; margin-right:4px; }
+  .score{ font-variant-numeric: tabular-nums; font-weight:900; text-align:right; font-size: clamp(22px, 5.2vw, 28px); }
+  /* Only turn red when >= limit+1 */
   .score.over{ color:var(--danger) }
   .actions{ display:flex; gap:4px; justify-content:flex-end }
+  .actions .iconbtn{ width:40px; height:40px; font-size:16px; }
 
   /* Banner (game over) */
   .banner{ margin:10px 0; padding:10px 12px; border-radius:14px; border:1px solid rgba(255,255,255,.1);
@@ -153,20 +156,12 @@
       <span class="chip">Conga / Chinchón</span>
       <span class="brand">Alanis Scorekeeper</span>
     </div>
-    <button id="openSettings" class="iconbtn" aria-label="Settings">⚙️</button>
-  </header>
-
-  <!-- Dealer / actions -->
-  <section class="card" style="padding:10px; margin-bottom:8px">
-    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap">
-      <div><strong data-i18n="nextDealer">Next dealer:</strong> <span id="nextDealerName">—</span></div>
-      <div class="hint" data-i18n="dealerHint">Long-press player row to set dealer (or use Edit).</div>
-      <div style="margin-left:auto; display:flex; gap:8px">
-        <button id="historyBtn" class="btn ghost">History</button>
-        <button id="newRoundBtn" class="btn primary" data-i18n="newRound">New round</button>
-      </div>
+    <div style="display:flex; gap:8px">
+      <button id="historyBtn" class="btn ghost">History</button>
+      <button id="newRoundBtn" class="btn primary" data-i18n="newRound">New round</button>
+      <button id="openSettings" class="iconbtn" aria-label="Settings">⚙️</button>
     </div>
-  </section>
+  </header>
 
   <!-- Players -->
   <section class="players">
@@ -192,6 +187,13 @@
     <button class="btn ghost" onclick="settingsDialog.close()">Close</button>
   </div>
   <div class="modal-body" style="display:grid; gap:14px">
+    <div class="card" style="padding:10px">
+      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap">
+        <div><strong data-i18n="nextDealer">Next dealer:</strong> <span id="nextDealerName">—</span></div>
+        <div class="hint" data-i18n="dealerHint">Long-press a player row to set dealer.</div>
+      </div>
+    </div>
+
     <div>
       <label for="limitInput" data-i18n="limitLabel">Limit (default 100)</label>
       <input id="limitInput" type="number" inputmode="numeric" min="1" step="1" />
@@ -382,8 +384,8 @@
 
   /* i18n */
   const I18N = {
-    en:{title:"Scorekeeper",resetScores:"Reset scores",resetTip:"Reset all scores to 0",limitLabel:"Limit (default 100)",autoAdvance:"Auto-advance dealer after round",nextDealer:"Next dealer:",dealerHint:"Long-press player row to set dealer (or use Edit).",players:"Players",addPlayer:"+ Add player",gameOver:"Game over",newGame:"New game",newRound:"New round",exportCSV:"Export CSV",clearAll:"Clear all",roundTitle:"New Round",roundHint:"Enter points (negatives OK). “−10” changes the input.",whoCut:"Who cut (cortó)?",optional:"(optional)",close:"Close",cancel:"Cancel",apply:"Apply",editPlayer:"Edit player",name:"Name",score:"Score",reenganches:"Reenganches",save:"Save",winCut:"wins! Cut victory (all others > limit)",cutterInvalid:"Invalid cutter selected.",cutterExceeds:(limit,projected)=>`Cutter cannot exceed ${limit}. (Projected: ${projected})`,player:"Player",current:"Current",delete:"Delete player",confirmDelete:"Delete this player? This cannot be undone.",settings:"Settings",history:"History",roundsTitle:"Rounds history"},
-    es:{title:"Marcador",resetScores:"Reiniciar puntajes",resetTip:"Poner todos los puntajes en 0",limitLabel:"Límite (por defecto 100)",autoAdvance:"Avanzar repartidor automáticamente después de la ronda",nextDealer:"Próximo repartidor:",dealerHint:"Mantén presionado la fila del jugador para marcar repartidor (o usar Editar).",players:"Jugadores",addPlayer:"+ Agregar jugador",gameOver:"Partida terminada",newGame:"Nueva partida",newRound:"Nueva ronda",exportCSV:"Exportar CSV",clearAll:"Limpiar todo",roundTitle:"Nueva ronda",roundHint:"Ingresa puntos (se permiten negativos). “−10” cambia el campo.",whoCut:"¿Quién cortó?",optional:"(opcional)",close:"Cerrar",cancel:"Cancelar",apply:"Aplicar",editPlayer:"Editar jugador",name:"Nombre",score:"Puntaje",reenganches:"Reenganches",save:"Guardar",winCut:"¡gana! Corte con victoria (los demás > límite)",cutterInvalid:"Cortador inválido.",cutterExceeds:(limit,projected)=>`El cortador no puede pasar de ${limit}. (Proyectado: ${projected})`,player:"Jugador",current:"Actual",delete:"Eliminar jugador",confirmDelete:"¿Eliminar este jugador? No se puede deshacer.",settings:"Configuración",history:"Historial",roundsTitle:"Historial de rondas"}
+    en:{title:"Scorekeeper",resetScores:"Reset scores",resetTip:"Reset all scores to 0",limitLabel:"Limit (default 100)",autoAdvance:"Auto-advance dealer after round",nextDealer:"Next dealer:",dealerHint:"Long-press a player row to set dealer.",players:"Players",addPlayer:"+ Add player",gameOver:"Game over",newGame:"New game",newRound:"New round",exportCSV:"Export CSV",clearAll:"Clear all",roundTitle:"New Round",roundHint:"Enter points (negatives OK). “−10” changes the input.",whoCut:"Who cut (cortó)?",optional:"(optional)",close:"Close",cancel:"Cancel",apply:"Apply",editPlayer:"Edit player",name:"Name",score:"Score",reenganches:"Reenganches",save:"Save",winCut:"wins! Cut victory (all others > limit)",cutterInvalid:"Invalid cutter selected.",cutterExceeds:(limit,projected)=>`Cutter cannot exceed ${limit}. (Projected: ${projected})`,player:"Player",current:"Current",delete:"Delete player",confirmDelete:"Delete this player? This cannot be undone.",settings:"Settings",history:"History",roundsTitle:"Rounds history"},
+    es:{title:"Marcador",resetScores:"Reiniciar puntajes",resetTip:"Poner todos los puntajes en 0",limitLabel:"Límite (por defecto 100)",autoAdvance:"Avanzar repartidor automáticamente después de la ronda",nextDealer:"Próximo repartidor:",dealerHint:"Mantén presionado la fila del jugador para marcar repartidor.",players:"Jugadores",addPlayer:"+ Agregar jugador",gameOver:"Partida terminada",newGame:"Nueva partida",newRound:"Nueva ronda",exportCSV:"Exportar CSV",clearAll:"Limpiar todo",roundTitle:"Nueva ronda",roundHint:"Ingresa puntos (se permiten negativos). “−10” cambia el campo.",whoCut:"¿Quién cortó?",optional:"(opcional)",close:"Cerrar",cancel:"Cancelar",apply:"Aplicar",editPlayer:"Editar jugador",name:"Nombre",score:"Puntaje",reenganches:"Reenganches",save:"Guardar",winCut:"¡gana! Corte con victoria (los demás > límite)",cutterInvalid:"Cortador inválido.",cutterExceeds:(limit,projected)=>`El cortador no puede pasar de ${limit}. (Proyectado: ${projected})`,player:"Jugador",current:"Actual",delete:"Eliminar jugador",confirmDelete:"¿Eliminar este jugador? No se puede deshacer.",settings:"Configuración",history:"Historial",roundsTitle:"Historial de rondas"}
   };
   const LangKey="conga_lang";
   const detectLang=()=>{const s=localStorage.getItem(LangKey); if(s&&I18N[s]) return s; return (navigator.language||"en").toLowerCase().startsWith("es")?"es":"en";};
@@ -399,7 +401,7 @@
   };
 
   /* State */
-  const storageKey="conga_state_ui_rev2";
+  const storageKey="conga_state_ui_rev3";
   let players=[], limit=100, nextDealerId=null, autoAdvanceDealer=true, gameOver=false;
   let cutsHistory=[]; let roundCounter=0; let rounds=[];
 
@@ -441,28 +443,30 @@
       n.addEventListener("dragover",dragOver); 
       n.addEventListener("drop",drop); 
       n.addEventListener("dragend",dragEnd);
-      if(p.id===nextDealerId) n.classList.add("dealer");
 
-      // Long-press ANYWHERE on the row to set dealer
+      // Long-press the whole row to set dealer
       attachLongPress(n, ()=>setDealer(p.id));
 
-      // Avatar / initials
+      if(p.id===nextDealerId) n.classList.add("dealer"); else n.classList.remove("dealer");
+
       const avatarBox=n.querySelector(".avatar");
       const init=avatarBox.querySelector(".initials");
       init.textContent=initials(p.name||"");
       if(p.avatar){ avatarBox.innerHTML=`<img alt="" src="${p.avatar}">`; }
 
-      // Full name (wraps)
+      // Single-line name, big
       n.querySelector(".playerName").textContent=p.name||"—";
 
-      // ★ before score
+      // Reenganches star
       const sEl=n.querySelector(".stars");
       const r = clampInt(p.reenganches||0,0);
       sEl.textContent = r>0 ? (r===1 ? "★" : `★ ${r}`) : "";
 
-      // Score
-      const sv=n.querySelector(".scoreVal"); sv.textContent=clampInt(p.score||0);
-      const scWrap=n.querySelector(".score"); if((p.score||0)>limit) scWrap.classList.add("over"); else scWrap.classList.remove("over");
+      // Score (red only at >= limit+1)
+      const sv=n.querySelector(".scoreVal"); 
+      sv.textContent=clampInt(p.score||0);
+      const scWrap=n.querySelector(".score"); 
+      if((p.score||0) >= (limit+1)) scWrap.classList.add("over"); else scWrap.classList.remove("over");
 
       // Edit
       n.querySelector('[data-action="edit"]').onclick=()=>openEdit(p.id);
@@ -500,7 +504,7 @@
 
   /* Photo + cropper */
   const photoInput=document.getElementById("photoInput"); let photoTarget=null;
-  photoInput.removeAttribute('capture');
+  photoInput.removeAttribute('capture'); // allow camera or library
   photoInput.addEventListener("change", async()=>{
     if(!photoTarget||!photoInput.files?.[0]) return;
     const file=photoInput.files[0];
@@ -681,7 +685,7 @@
     })();
   }
 
-  /* Cropper (unchanged) */
+  /* Cropper */
   const cropDialog=document.getElementById('cropDialog');
   const cropCanvas=document.getElementById('cropCanvas');
   const cropCtx=cropCanvas.getContext('2d');
@@ -724,23 +728,17 @@
     historyDialog.showModal();
   }
 
-  /* Rounds table (totals) */
+  /* Rounds table */
   function openRoundsTable(){
-    const wrap = $("#roundsTableWrap"); 
-    wrap.innerHTML = "";
-    if(!rounds.length){
-      wrap.innerHTML = '<div class="history-item">No rounds yet.</div>';
-      roundsDialog.showModal(); 
-      return; 
-    }
-
-    const table = document.createElement('table');
-    const thead = document.createElement('thead'); const trh = document.createElement('tr');
-    const th0 = document.createElement('th'); th0.textContent = "#"; trh.appendChild(th0);
+    const wrap=$("#roundsTableWrap"); wrap.innerHTML="";
+    if(!rounds.length){ wrap.innerHTML='<div class="history-item">No rounds yet.</div>'; roundsDialog.showModal(); return; }
+    const table=document.createElement('table');
+    const thead=document.createElement('thead'); const trh=document.createElement('tr');
+    const th0=document.createElement('th'); th0.textContent="#"; trh.appendChild(th0);
     players.forEach(p=>{ const th=document.createElement('th'); th.textContent=p.name; trh.appendChild(th); });
     thead.appendChild(trh); table.appendChild(thead);
 
-    const tbody = document.createElement('tbody');
+    const tbody=document.createElement('tbody');
     rounds.forEach(r=>{
       const tr=document.createElement('tr');
       const th=document.createElement('th'); th.textContent=String(r.round); tr.appendChild(th);
