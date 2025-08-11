@@ -23,7 +23,7 @@
     color:var(--text); -webkit-font-smoothing:antialiased; line-height:1.35;}
   .app{max-width:980px; margin:0 auto; padding:10px 12px 120px;}
 
-  /* Compact top bar */
+  /* Top bar */
   header{display:flex; align-items:center; justify-content:space-between; gap:8px; margin:2px 0 8px 0;}
   .top-left{display:flex; align-items:center; gap:10px}
   .chip{background:linear-gradient(135deg, var(--accent), #a77dff); color:#0b0f1f; padding:3px 10px; border-radius:999px; font-weight:800; font-size:11px; text-transform:uppercase; letter-spacing:.6px;}
@@ -44,7 +44,7 @@
   .players header{ margin:0 0 6px 2px; color:var(--sub); font-size:12px; }
   .row{
     display:grid;
-    grid-template-columns: 28px 52px 1fr auto auto; /* drag | avatar | NAME | scorewrap | actions */
+    grid-template-columns: 28px 52px minmax(120px,1fr) auto auto; /* drag | avatar | NAME | score | edit */
     align-items:center; gap:8px;
     padding:10px; border-radius:14px;
     border:1px solid rgba(255,255,255,.06);
@@ -61,18 +61,25 @@
   .row.dealer .avatar{ box-shadow: 0 0 0 3px #4ee1a0, 0 0 0 6px rgba(78,225,160,.25); }
   .avatar img{ width:100%; height:100%; object-fit:cover; display:block; }
 
-  /* Bigger names */
-  .playerName{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; line-height:1.1;
-    font-size: clamp(20px, 5vw, 26px); font-weight:900; letter-spacing:.2px; }
+  /* FULL name (no ellipsis), allow wrapping up to 2 lines */
+  .playerName{
+    min-width:0;
+    white-space:normal;       /* allow wrap */
+    overflow:visible;         /* show full text */
+    word-break:break-word;
+    line-height:1.1;
+    font-size: clamp(20px, 5vw, 26px);
+    font-weight:900;
+    letter-spacing:.2px;
+  }
 
-  .stars{ color:var(--danger); font-weight:900; font-size:16px; white-space:nowrap; margin-right:8px } /* single star + count */
+  .stars{ color:var(--danger); font-weight:900; font-size:16px; white-space:nowrap; margin-right:6px }
 
-  /* Tighter right side so score sits closer to Edit */
-  .scorewrap{ display:flex; align-items:center; gap:4px; min-width:72px; justify-content:flex-end; }
+  /* Score tighter to Edit */
+  .scorewrap{ display:flex; align-items:center; gap:2px; min-width:64px; justify-content:flex-end; margin-right:4px;}
   .score{ font-variant-numeric: tabular-nums; font-weight:900; text-align:right; font-size:18px; }
   .score.over{ color:var(--danger) }
   .actions{ display:flex; gap:4px; justify-content:flex-end }
-  .iconbtn{ width:46px; height:46px; font-size:22px; } /* bigger icons */
 
   /* Banner (game over) */
   .banner{ margin:10px 0; padding:10px 12px; border-radius:14px; border:1px solid rgba(255,255,255,.1);
@@ -109,16 +116,8 @@
   .hint{ color:var(--sub); font-size:12px }
 
   /* WIN OVERLAY */
-  .win-overlay {
-    position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
-    background: rgba(5,8,20,.55); z-index: 9999; padding: 16px;
-  }
-  .win-card {
-    width: min(560px, 94vw); border-radius: 20px; padding: 14px;
-    border: 1px solid rgba(255,255,255,.12);
-    background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02)), #0f1428;
-    box-shadow: 0 24px 64px rgba(0,0,0,.55); position: relative; overflow: hidden;
-  }
+  .win-overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(5,8,20,.55); z-index: 9999; padding: 16px; }
+  .win-card { width: min(560px, 94vw); border-radius: 20px; padding: 14px; border: 1px solid rgba(255,255,255,.12); background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02)), #0f1428; box-shadow: 0 24px 64px rgba(0,0,0,.55); position: relative; overflow: hidden; }
   .win-head { display:flex; align-items:center; gap:12px; }
   .win-photo { width:72px; height:72px; border-radius:50%; overflow:hidden; border:2px solid #4ee1a0; box-shadow:0 0 0 6px rgba(78,225,160,.25); }
   .win-photo img{ width:100%; height:100%; object-fit:cover; }
@@ -161,7 +160,7 @@
   <section class="card" style="padding:10px; margin-bottom:8px">
     <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap">
       <div><strong data-i18n="nextDealer">Next dealer:</strong> <span id="nextDealerName">—</span></div>
-      <div class="hint" data-i18n="dealerHint">Long-press avatar to set dealer (or use Edit).</div>
+      <div class="hint" data-i18n="dealerHint">Long-press player row to set dealer (or use Edit).</div>
       <div style="margin-left:auto; display:flex; gap:8px">
         <button id="historyBtn" class="btn ghost">History</button>
         <button id="newRoundBtn" class="btn primary" data-i18n="newRound">New round</button>
@@ -370,7 +369,6 @@
       <span class="score" aria-label="Score"><span class="scoreVal">0</span></span>
     </div>
     <div class="actions">
-      <button class="iconbtn set-dealer" title="Set as next dealer" aria-label="Set as next dealer">🎲</button>
       <button class="iconbtn edit-btn" title="Edit player" data-action="edit" aria-label="Edit player">✎</button>
     </div>
   </div>
@@ -384,8 +382,8 @@
 
   /* i18n */
   const I18N = {
-    en:{title:"Scorekeeper",resetScores:"Reset scores",resetTip:"Reset all scores to 0",limitLabel:"Limit (default 100)",autoAdvance:"Auto-advance dealer after round",nextDealer:"Next dealer:",dealerHint:"Long-press avatar to set dealer (or use Edit).",players:"Players",addPlayer:"+ Add player",gameOver:"Game over",newGame:"New game",newRound:"New round",exportCSV:"Export CSV",clearAll:"Clear all",roundTitle:"New Round",roundHint:"Enter points (negatives OK). “−10” changes the input.",whoCut:"Who cut (cortó)?",optional:"(optional)",close:"Close",cancel:"Cancel",apply:"Apply",editPlayer:"Edit player",name:"Name",score:"Score",reenganches:"Reenganches",save:"Save",winCut:"wins! Cut victory (all others > limit)",cutterInvalid:"Invalid cutter selected.",cutterExceeds:(limit,projected)=>`Cutter cannot exceed ${limit}. (Projected: ${projected})`,player:"Player",current:"Current",delete:"Delete player",confirmDelete:"Delete this player? This cannot be undone.",settings:"Settings",history:"History",roundsTitle:"Rounds history"},
-    es:{title:"Marcador",resetScores:"Reiniciar puntajes",resetTip:"Poner todos los puntajes en 0",limitLabel:"Límite (por defecto 100)",autoAdvance:"Avanzar repartidor automáticamente después de la ronda",nextDealer:"Próximo repartidor:",dealerHint:"Mantén presionado el avatar para marcar repartidor (o usar Editar).",players:"Jugadores",addPlayer:"+ Agregar jugador",gameOver:"Partida terminada",newGame:"Nueva partida",newRound:"Nueva ronda",exportCSV:"Exportar CSV",clearAll:"Limpiar todo",roundTitle:"Nueva ronda",roundHint:"Ingresa puntos (se permiten negativos). “−10” cambia el campo.",whoCut:"¿Quién cortó?",optional:"(opcional)",close:"Cerrar",cancel:"Cancelar",apply:"Aplicar",editPlayer:"Editar jugador",name:"Nombre",score:"Puntaje",reenganches:"Reenganches",save:"Guardar",winCut:"¡gana! Corte con victoria (los demás > límite)",cutterInvalid:"Cortador inválido.",cutterExceeds:(limit,projected)=>`El cortador no puede pasar de ${limit}. (Proyectado: ${projected})`,player:"Jugador",current:"Actual",delete:"Eliminar jugador",confirmDelete:"¿Eliminar este jugador? No se puede deshacer.",settings:"Configuración",history:"Historial",roundsTitle:"Historial de rondas"}
+    en:{title:"Scorekeeper",resetScores:"Reset scores",resetTip:"Reset all scores to 0",limitLabel:"Limit (default 100)",autoAdvance:"Auto-advance dealer after round",nextDealer:"Next dealer:",dealerHint:"Long-press player row to set dealer (or use Edit).",players:"Players",addPlayer:"+ Add player",gameOver:"Game over",newGame:"New game",newRound:"New round",exportCSV:"Export CSV",clearAll:"Clear all",roundTitle:"New Round",roundHint:"Enter points (negatives OK). “−10” changes the input.",whoCut:"Who cut (cortó)?",optional:"(optional)",close:"Close",cancel:"Cancel",apply:"Apply",editPlayer:"Edit player",name:"Name",score:"Score",reenganches:"Reenganches",save:"Save",winCut:"wins! Cut victory (all others > limit)",cutterInvalid:"Invalid cutter selected.",cutterExceeds:(limit,projected)=>`Cutter cannot exceed ${limit}. (Projected: ${projected})`,player:"Player",current:"Current",delete:"Delete player",confirmDelete:"Delete this player? This cannot be undone.",settings:"Settings",history:"History",roundsTitle:"Rounds history"},
+    es:{title:"Marcador",resetScores:"Reiniciar puntajes",resetTip:"Poner todos los puntajes en 0",limitLabel:"Límite (por defecto 100)",autoAdvance:"Avanzar repartidor automáticamente después de la ronda",nextDealer:"Próximo repartidor:",dealerHint:"Mantén presionado la fila del jugador para marcar repartidor (o usar Editar).",players:"Jugadores",addPlayer:"+ Agregar jugador",gameOver:"Partida terminada",newGame:"Nueva partida",newRound:"Nueva ronda",exportCSV:"Exportar CSV",clearAll:"Limpiar todo",roundTitle:"Nueva ronda",roundHint:"Ingresa puntos (se permiten negativos). “−10” cambia el campo.",whoCut:"¿Quién cortó?",optional:"(opcional)",close:"Cerrar",cancel:"Cancelar",apply:"Aplicar",editPlayer:"Editar jugador",name:"Nombre",score:"Puntaje",reenganches:"Reenganches",save:"Guardar",winCut:"¡gana! Corte con victoria (los demás > límite)",cutterInvalid:"Cortador inválido.",cutterExceeds:(limit,projected)=>`El cortador no puede pasar de ${limit}. (Proyectado: ${projected})`,player:"Jugador",current:"Actual",delete:"Eliminar jugador",confirmDelete:"¿Eliminar este jugador? No se puede deshacer.",settings:"Configuración",history:"Historial",roundsTitle:"Historial de rondas"}
   };
   const LangKey="conga_lang";
   const detectLang=()=>{const s=localStorage.getItem(LangKey); if(s&&I18N[s]) return s; return (navigator.language||"en").toLowerCase().startsWith("es")?"es":"en";};
@@ -403,7 +401,7 @@
   /* State */
   const storageKey="conga_state_ui_rev2";
   let players=[], limit=100, nextDealerId=null, autoAdvanceDealer=true, gameOver=false;
-  let cutsHistory=[]; let roundCounter=0; let rounds=[]; // per-round snapshots
+  let cutsHistory=[]; let roundCounter=0; let rounds=[];
 
   /* Utils */
   const $=s=>document.querySelector(s);
@@ -417,7 +415,7 @@
       const s=JSON.parse(localStorage.getItem(storageKey)||"{}");
       players = s.players || [];
       limit   = Number.isFinite(s.limit) ? s.limit : 100;
-      autoAdvanceDealer = (typeof s.autoAdvanceDealer === "boolean") ? s.autoAdvanceDealer : true; // default ON
+      autoAdvanceDealer = (typeof s.autoAdvanceDealer === "boolean") ? s.autoAdvanceDealer : true;
       nextDealerId = (typeof s.nextDealerId==="string") ? s.nextDealerId : (players[0]?.id ?? null);
       gameOver = !!s.gameOver;
       cutsHistory = s.cutsHistory || [];
@@ -439,27 +437,35 @@
     players.forEach((p,i)=>{
       const n=rowTpl.content.firstElementChild.cloneNode(true);
       n.dataset.index=i; n.dataset.id=p.id;
-      n.addEventListener("dragstart",dragStart); n.addEventListener("dragover",dragOver); n.addEventListener("drop",drop); n.addEventListener("dragend",dragEnd);
+      n.addEventListener("dragstart",dragStart); 
+      n.addEventListener("dragover",dragOver); 
+      n.addEventListener("drop",drop); 
+      n.addEventListener("dragend",dragEnd);
       if(p.id===nextDealerId) n.classList.add("dealer");
 
+      // Long-press ANYWHERE on the row to set dealer
+      attachLongPress(n, ()=>setDealer(p.id));
+
+      // Avatar / initials
       const avatarBox=n.querySelector(".avatar");
       const init=avatarBox.querySelector(".initials");
       init.textContent=initials(p.name||"");
       if(p.avatar){ avatarBox.innerHTML=`<img alt="" src="${p.avatar}">`; }
-      attachLongPress(avatarBox, ()=>setDealer(p.id));
 
+      // Full name (wraps)
       n.querySelector(".playerName").textContent=p.name||"—";
 
-      // ★ near score
+      // ★ before score
       const sEl=n.querySelector(".stars");
       const r = clampInt(p.reenganches||0,0);
       sEl.textContent = r>0 ? (r===1 ? "★" : `★ ${r}`) : "";
 
+      // Score
       const sv=n.querySelector(".scoreVal"); sv.textContent=clampInt(p.score||0);
       const scWrap=n.querySelector(".score"); if((p.score||0)>limit) scWrap.classList.add("over"); else scWrap.classList.remove("over");
 
+      // Edit
       n.querySelector('[data-action="edit"]').onclick=()=>openEdit(p.id);
-      n.querySelector('.set-dealer').onclick=()=>setDealer(p.id);
 
       list.appendChild(n);
     });
@@ -494,7 +500,7 @@
 
   /* Photo + cropper */
   const photoInput=document.getElementById("photoInput"); let photoTarget=null;
-  photoInput.removeAttribute('capture'); // allow both Camera and Photo Library
+  photoInput.removeAttribute('capture');
   photoInput.addEventListener("change", async()=>{
     if(!photoTarget||!photoInput.files?.[0]) return;
     const file=photoInput.files[0];
@@ -551,7 +557,6 @@
   const selectedCutter=()=>{ const sel=document.querySelector('input[name="cutter"]:checked'); const v=sel?sel.value:""; return v||null; };
   function validateRound(){ const inputs=roundInputs(); const cid=selectedCutter(); if(!cid){ rErr.style.display="none"; applyBtn.disabled=false; return true; } const c=players.find(p=>p.id===cid); if(!c){ rErr.textContent=t("cutterInvalid"); rErr.style.display=""; applyBtn.disabled=true; return false; } const proj=clampInt(c.score||0)+clampInt(inputs[c.id]??0); if(proj>limit){ rErr.textContent=(I18N[lang].cutterExceeds||I18N.en.cutterExceeds)(limit,proj); rErr.style.display=""; applyBtn.disabled=true; return false; } rErr.style.display="none"; applyBtn.disabled=false; return true; }
 
-  // helper: snapshot totals by player id (after we've set p.score)
   function snapshotTotalsById() {
     const o = {};
     players.forEach(p => { o[p.id] = clampInt(p.score||0); });
@@ -559,21 +564,17 @@
   }
 
   function applyRound(inputs,cid){
-    // store deltas (for table) before any transformations
     const snapshotInputs = JSON.parse(JSON.stringify(inputs));
     const roundNo = roundCounter + 1;
 
-    // 1) Sum all inputs
     const proj=new Map(); players.forEach(p=>{ proj.set(p.id, clampInt(p.score||0)+clampInt(inputs[p.id]??0)); });
 
-    // count/mark cut
     roundCounter += 1;
     if (cid){
       const cutter = players.find(p=>p.id===cid);
       cutsHistory.push({ id: cid, name: cutter?.name||"—", round: roundCounter, timestamp: Date.now(), result: "played" });
     }
 
-    // 2-player immediate win BEFORE reenganche
     if(players.length===2){
       const [a,b]=players; const A=proj.get(a.id), B=proj.get(b.id);
       if(A>=limit+1 && B<=limit){
@@ -588,7 +589,6 @@
       }
     }
 
-    // Cutter immediate win check
     if(cid){
       const cProj=proj.get(cid); const ok=cProj<=limit;
       const others=players.filter(p=>p.id!==cid); const allOver=others.every(o=>(proj.get(o.id)??o.score)>limit);
@@ -603,7 +603,6 @@
       }
     }
 
-    // Reenganche: ANY score ≥101 drops to max ≤ limit among others (+1 reenganches)
     players.forEach(p=>{
       let val=proj.get(p.id);
       if(val>=limit+1){
@@ -614,13 +613,10 @@
       }
     });
 
-    // Apply totals
     players.forEach(p=>{ p.score=proj.get(p.id); });
 
-    // Advance dealer
     if(autoAdvanceDealer) advanceDealer();
 
-    // history not a cut win
     if (cid){
       const last = cutsHistory.slice().reverse().find(h => h.round===roundCounter && h.id===cid);
       if (last && last.result==="played") last.result="normal";
@@ -633,7 +629,7 @@
   /* CSV */
   const exportCSV=()=>{ const header=["name","score","reenganches","isDealer"]; const rows=players.map(p=>[csv(p.name||""), String(clampInt(p.score||0)), String(clampInt(p.reenganches||0)), String(p.id===nextDealerId)]); const all=[header].concat(rows).map(r=>r.join(",")).join("\n"); const blob=new Blob(["\ufeff",all],{type:"text/csv;charset=utf-8"}); const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="conga_scores.csv"; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();},0); };
 
-  /* Win overlay + confetti & fireworks */
+  /* Win overlay */
   const winOverlay=document.getElementById('winOverlay');
   const winNameEl=document.getElementById('winName');
   const winPhotoEl=document.getElementById('winPhoto');
@@ -650,7 +646,7 @@
     startConfetti();
     try{winSound.currentTime=0; winSound.play().catch(()=>{});}catch{}
   }
-  function hideWinOverlay(){ winOverlay.style.display='none'; stopConfetti(); }
+  function hideWinOverlay(){ winOverlay.style.display='none'; cancelAnimationFrame(confettiAnim); }
   winCloseBtn.addEventListener('click', hideWinOverlay);
   winOverlay.addEventListener('click', (e)=>{ if(e.target===winOverlay) hideWinOverlay(); });
 
@@ -664,32 +660,16 @@
     const W = ()=>confettiCanvas.width, H = ()=>confettiCanvas.height;
     const colors = ['#FFD166','#06D6A0','#118AB2','#EF476F','#A78BFA','#FF9F1C','#2EC4B6'];
 
-    const confetti = Array.from({length:240},()=>({
+    const confetti = Array.from({length:220},()=>({
       x: Math.random()*W(), y: -Math.random()*H(), r: 2+Math.random()*4,
       c: colors[(Math.random()*colors.length)|0],
       vx: -1 + Math.random()*2, vy: 1 + Math.random()*2.8,
       a: Math.random()*Math.PI*2, va: -0.2+Math.random()*0.4
     }));
 
-    const bursts = [];
-    function spawnBurst(){
-      const cx = W()*(.15+.7*Math.random());
-      const cy = H()*(.25+.35*Math.random());
-      const n = 36 + (Math.random()*24|0);
-      const particles = Array.from({length:n}, (_,i)=> {
-        const ang = (i/n)*Math.PI*2;
-        const sp  = 2.2 + Math.random()*2.2;
-        return {x:cx, y:cy, vx:Math.cos(ang)*sp, vy:Math.sin(ang)*sp,
-                life: 1, color: colors[(Math.random()*colors.length)|0]};
-      });
-      bursts.push({particles});
-    }
-    let burstTimer = 0;
-
     (function loop(){
       const w=W(), h=H();
       ctx.clearRect(0,0,w,h);
-
       for(const p of confetti){
         p.x += p.vx; p.y += p.vy; p.a += p.va;
         if(p.y > h+20){ p.y = -10; p.x = Math.random()*w; }
@@ -697,27 +677,11 @@
         ctx.fillStyle = p.c; ctx.fillRect(-p.r, -p.r, p.r*2, p.r*2);
         ctx.restore();
       }
-
-      burstTimer += 1;
-      if (burstTimer % 30 === 0 && bursts.length < 6) spawnBurst();
-      for (const b of bursts){
-        for (const pt of b.particles){
-          pt.x += pt.vx; pt.y += pt.vy; pt.vy += 0.02;
-          pt.life *= 0.97;
-          ctx.globalAlpha = Math.max(0, pt.life);
-          ctx.fillStyle = pt.color;
-          ctx.beginPath(); ctx.arc(pt.x, pt.y, 2.2, 0, Math.PI*2); ctx.fill();
-          ctx.globalAlpha = 1;
-        }
-        b.particles = b.particles.filter(p=>p.life>0.1);
-      }
-
       confettiAnim = requestAnimationFrame(loop);
     })();
   }
-  function stopConfetti(){ cancelAnimationFrame(confettiAnim); }
 
-  /* Cropper */
+  /* Cropper (unchanged) */
   const cropDialog=document.getElementById('cropDialog');
   const cropCanvas=document.getElementById('cropCanvas');
   const cropCtx=cropCanvas.getContext('2d');
@@ -760,7 +724,7 @@
     historyDialog.showModal();
   }
 
-  /* Rounds table (now shows totals per round) */
+  /* Rounds table (totals) */
   function openRoundsTable(){
     const wrap = $("#roundsTableWrap"); 
     wrap.innerHTML = "";
@@ -771,44 +735,21 @@
     }
 
     const table = document.createElement('table');
+    const thead = document.createElement('thead'); const trh = document.createElement('tr');
+    const th0 = document.createElement('th'); th0.textContent = "#"; trh.appendChild(th0);
+    players.forEach(p=>{ const th=document.createElement('th'); th.textContent=p.name; trh.appendChild(th); });
+    thead.appendChild(trh); table.appendChild(thead);
 
-    // Head
-    const thead = document.createElement('thead');
-    const trh = document.createElement('tr');
-    const th0 = document.createElement('th'); 
-    th0.textContent = "#";
-    trh.appendChild(th0);
-    players.forEach(p => {
-      const th = document.createElement('th'); 
-      th.textContent = p.name; 
-      trh.appendChild(th);
-    });
-    thead.appendChild(trh); 
-    table.appendChild(thead);
-
-    // Body (prefer totals; fallback to inputs for old entries)
     const tbody = document.createElement('tbody');
-    rounds.forEach(r => {
-      const tr = document.createElement('tr');
-      const th = document.createElement('th'); 
-      th.textContent = String(r.round); 
-      tr.appendChild(th);
-
+    rounds.forEach(r=>{
+      const tr=document.createElement('tr');
+      const th=document.createElement('th'); th.textContent=String(r.round); tr.appendChild(th);
       const showTotals = r.totals && typeof r.totals === 'object';
-      players.forEach(p => {
-        const td = document.createElement('td');
-        let v;
-        if (showTotals) {
-          v = r.totals[p.id];
-        } else {
-          v = r.inputs[p.id]; // legacy
-        }
-        td.textContent = Number.isFinite(v) ? v : "";
-        tr.appendChild(td);
+      players.forEach(p=>{
+        const td=document.createElement('td'); const v=showTotals?r.totals[p.id]:r.inputs[p.id]; td.textContent=Number.isFinite(v)?v:""; tr.appendChild(td);
       });
       tbody.appendChild(tr);
     });
-
     table.appendChild(tbody);
     wrap.appendChild(table);
     roundsDialog.showModal();
@@ -842,7 +783,7 @@
   }
   render();
 
-  /* SW (optional; safe if file missing) */
+  /* SW */
   if('serviceWorker' in navigator){
     window.addEventListener('load', ()=>{
       navigator.serviceWorker.register('service-worker.js').catch(()=>{ /* ignore */ });
