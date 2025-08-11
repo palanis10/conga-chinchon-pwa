@@ -1,1 +1,911 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport"
+  content="width=device-width, initial-scale=1, user-scalable=yes, maximum-scale=5" />
+<title>Conga / Chinchón – Alanis Scorekeeper</title>
 
+<meta name="theme-color" content="#0f1220" />
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="icons/icon-512.png">
+<link rel="manifest" href="manifest.webmanifest">
+
+<style>
+  :root{
+    --bg:#0f1220; --card:#171a2b; --muted:#2a2f4a; --text:#e8ecff; --sub:#b8c0ff;
+    --accent:#7aa2ff; --accent-2:#4ee1a0; --danger:#ff6b6b; --warn:#ffb020;
+    --shadow: 0 8px 24px rgba(0,0,0,.35); --radius:16px;
+  }
+  *{box-sizing:border-box} html,body{height:100%}
+  body{
+    margin:0;
+    font-family: ui-sans-serif, -apple-system, Segoe UI, Roboto, Arial, Noto Sans, sans-serif;
+    background: radial-gradient(1200px 800px at 20% -10%, #162040, #0d1020 60%) fixed, var(--bg);
+    color:var(--text); -webkit-font-smoothing:antialiased; line-height:1.35;
+  }
+  .app{max-width:980px; margin:0 auto; padding: calc(8px + env(safe-area-inset-top, 0px)) 12px 120px;}
+
+  /* prevent iOS auto-zoom on focus but keep pinch */
+  input, select, textarea, button { font-size:16px; }
+
+  /* Top */
+  header.topbar{ display:flex; flex-direction:column; gap:8px; margin:2px 0 8px 0; }
+  .top-left{display:flex; align-items:center; gap:10px; min-width:0}
+  .chip{
+    background:linear-gradient(135deg, var(--accent), #a77dff); color:#0b0f1f;
+    padding:3px 10px; border-radius:999px; font-weight:800; font-size:11px;
+    text-transform:uppercase; letter-spacing:.6px;
+  }
+  .brand{opacity:.95; font-weight:900; letter-spacing:.2px; font-size: clamp(16px, 4vw, 22px);}
+  .version{opacity:.6; font-size:12px; margin-left:6px}
+  .top-actions{display:flex; gap:8px; align-items:center; justify-content:flex-end}
+
+  .btn{
+    appearance:none; border:0; cursor:pointer; user-select:none; padding:9px 12px; border-radius:12px;
+    background: linear-gradient(135deg, #1a2344, #121a34); border:1px solid rgba(255,255,255,.10);
+    color:var(--text); font-weight:700; letter-spacing:.2px; transition:.15s;
+  }
+  .btn:hover{ filter:brightness(1.07)} .btn:active{ transform:translateY(1px)}
+  .btn.primary{background: linear-gradient(135deg, var(--accent), #9f7cff); color:#0b0f1f;}
+  .btn.success{background: linear-gradient(135deg, var(--accent-2), #9cffc8); color:#001c12;}
+  .btn.warn{background: linear-gradient(135deg, #ffb020, #ffd27a); color:#2d1500;}
+  .btn.ghost{background: rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.14);}
+  .iconbtn{ width:44px; height:44px; display:grid; place-items:center; border-radius:12px; border:1px solid rgba(255,255,255,.12); background:#0f1428; color:var(--text); cursor:pointer; font-size:18px;}
+  .card{background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.0)) , var(--card);
+    border:1px solid rgba(255,255,255,.06); border-radius: var(--radius); box-shadow: var(--shadow); padding:12px;}
+
+  /* Tiny toast */
+  .toast{ position:fixed; left:50%; bottom:18px; transform:translateX(-50%);
+    background:#101636; color:#e8ecff; border:1px solid rgba(255,255,255,.14);
+    padding:8px 12px; border-radius:999px; font-weight:700; font-size:13px; z-index:99999; opacity:.98 }
+
+  /* Players */
+  .players header{ margin:0 0 6px 2px; color:var(--sub); font-size:12px; display:flex; align-items:center; justify-content:space-between; gap:8px }
+  .players .lockbtn{ border:none; background:transparent; color:#b8c0ff; cursor:pointer; font-size:18px; width:28px; height:28px; display:grid; place-items:center; border-radius:8px }
+  .players .lockbtn:hover{ background:rgba(255,255,255,.06) }
+
+  .row{
+    display:grid;
+    grid-template-columns: 28px 54px 1fr auto; /* drag | avatar | name | stars+score */
+    align-items:center; gap:10px;
+    padding:10px; border-radius:14px;
+    border:1px solid rgba(255,255,255,.06);
+    background: linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,0));
+    margin-bottom:8px; min-height:86px; touch-action:manipulation;
+  }
+  .drag{ cursor:grab; text-align:center; font-size:18px; color:var(--sub); }
+  .drag.locked{ cursor:default; color:#3d4161; opacity:.6 }
+  .row.dealer{ border-color: rgba(78,225,160,.55); box-shadow: 0 0 0 2px rgba(78,225,160,.22) inset; }
+  .avatar{
+    width:54px; height:54px; border-radius:50%; display:grid; place-items:center;
+    background:#0f1428; border:1px solid rgba(255,255,255,.14); overflow:hidden; font-weight:800;
+  }
+  .row.dealer .avatar{ box-shadow: 0 0 0 3px #4ee1a0, 0 0 0 6px rgba(78,225,160,.25); }
+  .avatar img{ width:100%; height:100%; object-fit:cover; display:block; }
+
+  .playerName{
+    min-width:0; white-space:nowrap; overflow:hidden; text-overflow:clip;
+    line-height:1.05; font-size: clamp(22px, 5.2vw, 28px); font-weight:900; letter-spacing:.2px;
+  }
+
+  .stars{ color:var(--danger); font-weight:900; font-size:18px; white-space:nowrap; margin-right:8px }
+  .scorewrap{ display:flex; align-items:center; gap:8px; white-space:nowrap; margin-left:auto; }
+  .score{ font-variant-numeric: tabular-nums; font-weight:900; text-align:right; font-size: clamp(22px, 5.2vw, 28px); }
+  .score.over{ color:var(--danger) }
+
+  /* Dialogs */
+  dialog{ width:min(720px, 96vw); border-radius:16px; border:1px solid rgba(255,255,255,.12);
+    background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01)) , #0f1428; color:var(--text);
+    box-shadow: 0 24px 64px rgba(0,0,0,.55); }
+  dialog::backdrop{ background: rgba(2,6,23,.55) }
+  .modal-head{ padding:12px 14px; border-bottom:1px solid rgba(255,255,255,.08); display:flex; align-items:center; justify-content:space-between; gap:10px }
+  .modal-body{ padding:12px 14px } .modal-foot{ padding:12px 14px; border-top:1px solid rgba(255,255,255,.08); display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap }
+  label{font-size:12px; color:var(--sub); display:block; margin-bottom:6px}
+  input[type="number"], input[type="text"], select{width:100%; background:#0f1428; border:1px solid var(--muted);
+    color:var(--text); padding:9px 10px; border-radius:12px; outline:none; height:38px;}
+  input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0;}
+  .switch{display:flex; align-items:center; gap:10px; background:#0f1428; border:1px solid var(--muted); padding:8px 10px; border-radius:12px; height:38px;}
+
+  /* Round dialog rows */
+  .grid-rows{ display:grid; gap:6px }
+  .round-row{
+    display:grid; grid-template-columns: 1fr 100px 56px 36px; gap:8px; align-items:center;
+    padding:6px; border:1px dashed rgba(255,255,255,.15); border-radius:12px;
+    background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.00));
+  }
+  .round-row input[type="number"]{ height:34px; padding:6px 8px; }
+  .round-row .minus10{ width:100%; height:34px; border-radius:10px; border:1px solid rgba(255,255,255,.12);
+    background:linear-gradient(135deg, #1c243e, #121a34); color:var(--text); font-weight:800; padding:0 4px; }
+  .r-cutter{ width:34px; height:34px; display:grid; place-items:center; border-radius:10px; border:1px dashed rgba(255,255,255,.20); }
+  .r-cutter input{ width:16px; height:16px; }
+
+  .error{ color:var(--danger); font-weight:700; margin-right:auto }
+  .hint{ color:var(--sub); font-size:12px }
+
+  /* WIN OVERLAY */
+  .win-overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(5,8,20,.55); z-index: 9999; padding: 16px; }
+  .win-card { width: min(640px, 96vw); border-radius: 22px; padding: 16px; border: 1px solid rgba(255,255,255,.12); background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02)), #0f1428; box-shadow: 0 24px 64px rgba(0,0,0,.55); position: relative; overflow: hidden; }
+  .win-head { display:flex; align-items:center; gap:14px; }
+  .win-photo { width:86px; height:86px; border-radius:50%; overflow:hidden; border:2px solid #4ee1a0; box-shadow:0 0 0 8px rgba(78,225,160,.25); }
+  .win-photo img{ width:100%; height:100%; object-fit:cover; }
+  .win-title { font-size: 26px; font-weight: 900; letter-spacing:.4px; }
+  .win-name  { font-size: 22px; font-weight: 800; }
+  .win-sub { color:#b8c0ff; }
+  #confettiCanvas { position:absolute; inset:0; pointer-events:none; }
+  .win-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:12px; flex-wrap:wrap; }
+
+  /* CROP MODAL */
+  #cropDialog canvas { width: 100%; height: auto; background:#0e1326; border-radius:12px; border:1px solid rgba(255,255,255,.12); touch-action: none; }
+  .crop-controls { display:flex; gap:10px; align-items:center; justify-content:space-between; margin-top:10px; }
+  .crop-frame-hint { color:#b8c0ff; font-size:12px; }
+
+  /* Rounds history (tight) */
+  .table-wrap{ overflow:auto; max-height:60vh; border:1px solid rgba(255,255,255,.12); border-radius:12px;}
+  table{ border-collapse:separate; border-spacing:0; table-layout:fixed; }
+  thead th{ position:sticky; top:0; background:#121633; border-bottom:1px solid rgba(255,255,255,.12); padding:8px; text-align:center; font-weight:800; font-size:16px; }
+  tbody td, tbody th{ padding:4px 8px; border-bottom:1px solid rgba(255,255,255,.06); text-align:right; font-variant-numeric:tabular-nums; font-size:16px; line-height:1.25;}
+  tbody tr:nth-child(odd){ background:rgba(255,255,255,.02) }
+  tbody th{ text-align:left; }
+  thead th:first-child, tbody th:first-child{ width:32px; padding-left:10px; padding-right:6px; text-align:left; }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+
+  <!-- Header -->
+  <header class="topbar">
+    <div class="top-left">
+      <span class="chip">Conga / Chinchón</span>
+      <span class="brand">Alanis Scorekeeper</span>
+      <span class="version">v13</span>
+      <button id="openSettings" class="iconbtn" aria-label="Settings" style="margin-left:auto">⚙️</button>
+    </div>
+    <div class="top-actions">
+      <button id="historyBtn" class="btn ghost">History</button>
+      <button id="newRoundBtn" class="btn primary">New round</button>
+    </div>
+  </header>
+
+  <!-- Players -->
+  <section class="players">
+    <header>
+      <div>Players</div>
+      <button id="lockToggle" class="lockbtn" aria-label="Lock player order" title="Lock player order">🔓</button>
+    </header>
+    <div id="playersList" aria-live="polite"></div>
+    <button class="btn ghost" id="addPlayerBtn" style="width:100%; margin-top:6px">+ Add player</button>
+  </section>
+
+  <!-- Optional banner -->
+  <section id="banner" class="card" style="display:none" aria-live="polite">
+    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; width:100%">
+      <strong id="bannerText"></strong>
+      <span class="hint">Game over</span>
+      <button class="btn success" id="newGameBtn" style="margin-left:auto">New game</button>
+    </div>
+  </section>
+</div>
+
+<!-- SETTINGS -->
+<dialog id="settingsDialog" aria-labelledby="settingsTitle">
+  <div class="modal-head">
+    <div id="settingsTitle" style="font-weight:800">Settings</div>
+    <button class="btn ghost" onclick="settingsDialog.close()">Close</button>
+  </div>
+  <div class="modal-body" style="display:grid; gap:14px">
+    <div class="card" style="padding:10px">
+      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap">
+        <div><strong>Next dealer:</strong> <span id="nextDealerName">—</span></div>
+        <div class="hint">Dealer can be changed in Edit.</div>
+      </div>
+    </div>
+
+    <div>
+      <label for="limitInput">Limit (default 100)</label>
+      <input id="limitInput" type="number" inputmode="numeric" min="1" step="1" />
+    </div>
+    <label class="switch">
+      <input id="autoAdvance" type="checkbox" />
+      <span>Auto-advance dealer after round</span>
+    </label>
+
+    <label class="switch">
+      <input id="lockOrderSwitch" type="checkbox" />
+      <span>Lock player order</span>
+    </label>
+
+    <div style="display:flex; gap:8px; flex-wrap:wrap">
+      <button class="btn" id="exportBtn">Export CSV</button>
+      <button class="btn" id="backupBtn">Backup (JSON)</button>
+      <button class="btn ghost" id="restoreBtn">Restore (JSON)</button>
+      <button class="btn ghost" id="winsBtn">Wins (7d)</button>
+      <button class="btn ghost" id="resetScoresBtn">Reset scores</button>
+      <button class="btn warn" id="clearAllBtn">Clear all</button>
+    </div>
+  </div>
+  <div class="modal-foot">
+    <button class="btn success" onclick="settingsDialog.close()">Done</button>
+  </div>
+</dialog>
+<input id="importJsonInput" type="file" accept="application/json" hidden>
+
+<!-- Round dialog -->
+<dialog id="roundDialog" aria-labelledby="roundTitle">
+  <div class="modal-head">
+    <div>
+      <div id="roundTitle" style="font-weight:800">New Round</div>
+      <div class="hint">Enter points (negatives OK). “−10” changes the input.</div>
+    </div>
+    <button class="btn ghost" onclick="roundDialog.close()">Close</button>
+  </div>
+  <form id="roundForm" method="dialog">
+    <div class="modal-body">
+      <div class="grid-rows" id="roundRows"></div>
+      <div style="margin-top:8px">
+        <label style="margin-bottom:6px; display:block"><strong>Who cut (cortó)?</strong> <span class="hint">(optional)</span></label>
+        <div id="cuttersGroup" role="radiogroup" aria-label="Cutter select" style="display:flex; flex-wrap:wrap; gap:6px"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <div id="roundError" class="error" style="display:none"></div>
+      <button type="button" class="btn ghost" onclick="roundDialog.close()">Cancel</button>
+      <button id="applyRoundBtn" type="submit" class="btn success">Apply</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Edit player dialog -->
+<dialog id="editDialog" aria-labelledby="editTitle">
+  <div class="modal-head">
+    <div id="editTitle" style="font-weight:800">Edit player</div>
+    <button class="btn ghost" onclick="editDialog.close()">Close</button>
+  </div>
+  <form id="editForm" method="dialog">
+    <div class="modal-body">
+      <input type="hidden" id="editId" />
+      <div style="display:grid; gap:10px">
+        <div>
+          <label for="editName">Name</label>
+          <input id="editName" type="text" required />
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px">
+          <div>
+            <label for="editScore">Score</label>
+            <input id="editScore" type="number" step="1" />
+          </div>
+          <div>
+            <label for="editReeng">Reenganches</label>
+            <input id="editReeng" type="number" step="1" min="0" />
+          </div>
+        </div>
+
+        <div style="display:grid; gap:10px; margin-top:6px">
+          <div>
+            <label>Photo</label>
+            <div style="display:flex; gap:8px; flex-wrap:wrap">
+              <button type="button" class="btn" id="changePhotoBtn">Change photo</button>
+              <button type="button" class="btn ghost" id="removePhotoBtn">Remove photo</button>
+              <button type="button" class="btn ghost" id="viewHistoryBtn">View cut history</button>
+            </div>
+          </div>
+          <label class="switch" style="display:flex; align-items:center; gap:10px">
+            <input id="setDealerSwitch" type="checkbox">
+            <span>Set as next dealer</span>
+          </label>
+          <div>
+            <button type="button" class="btn warn" id="deletePlayerBtn">Delete player</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" type="button" onclick="editDialog.close()">Cancel</button>
+      <button class="btn success" type="submit">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Rounds history dialog (current game only) -->
+<dialog id="roundsDialog" aria-labelledby="roundsTitle">
+  <div class="modal-head">
+    <div id="roundsTitle" style="font-weight:800">Rounds history</div>
+    <button class="btn ghost" onclick="roundsDialog.close()">Close</button>
+  </div>
+  <div class="modal-body">
+    <div class="table-wrap"><div id="roundsTableWrap"></div></div>
+  </div>
+</dialog>
+
+<!-- Wins dialog -->
+<dialog id="winsDialog" aria-labelledby="winsTitle">
+  <div class="modal-head">
+    <div id="winsTitle" style="font-weight:800">Wins (last 7 days)</div>
+    <button class="btn ghost" onclick="winsDialog.close()">Close</button>
+  </div>
+  <div class="modal-body">
+    <div id="winsWrap" class="history-list"></div>
+  </div>
+</dialog>
+
+<!-- Player cut history dialog -->
+<dialog id="historyDialog" aria-labelledby="historyTitle">
+  <div class="modal-head">
+    <div id="historyTitle" style="font-weight:800">Cut history</div>
+    <button class="btn ghost" onclick="historyDialog.close()">Close</button>
+  </div>
+  <div class="modal-body">
+    <div class="history-list" id="historyList"></div>
+  </div>
+</dialog>
+
+<!-- WIN OVERLAY -->
+<div class="win-overlay" id="winOverlay" aria-live="polite">
+  <div class="win-card">
+    <canvas id="confettiCanvas"></canvas>
+    <div class="win-head">
+      <div class="win-photo"><img id="winPhoto" alt=""></div>
+      <div>
+        <div class="win-title">🏆 WINNER</div>
+        <div class="win-name" id="winName">—</div>
+        <div class="win-sub" id="winSubtitle">Game over</div>
+      </div>
+      <button class="btn success" id="winCloseBtn" style="margin-left:auto">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- confetti chime -->
+<audio id="winSound" preload="auto">
+  <source type="audio/mp3"
+    src="data:audio/mp3;base64,//uQZAAAAAAAAAAAAAAAAAAAAAAAACwAAAAAAQAAABgAABcAAABWAAACAAACAQAAAC4AAABfAAAAdwAAAIQAAACkAAAAvwAAAN4AAAD///8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAAAgP8AAP//AP//AP8AAP//AAAAAP8AAP//AP//AP//AP//AP//AP//AAAAAAA="/>
+</audio>
+
+<!-- Player row template (NO edit button) -->
+<template id="playerRowTpl">
+  <div class="row" draggable="true" aria-grabbed="false">
+    <div class="drag" title="Drag to reorder" aria-label="Drag handle">≡</div>
+    <div class="avatar" aria-hidden="true"><span class="initials"></span></div>
+    <strong class="playerName"></strong>
+    <div class="scorewrap">
+      <span class="stars" aria-label="Reenganches"></span>
+      <span class="score" aria-label="Score"><span class="scoreVal">0</span></span>
+    </div>
+  </div>
+</template>
+
+<input id="photoInput" type="file" accept="image/*" hidden>
+
+<script>
+(() => {
+  "use strict";
+
+  /* State */
+  const storageKey="conga_state_ui_rev12"; // keep same to preserve users' data
+  const LangKey="conga_lang";
+  let players=[], limit=100, nextDealerId=null, autoAdvanceDealer=true, gameOver=false;
+  let cutsHistory=[]; let roundCounter=0; let rounds=[];
+  let winsLog=[]; // {playerId, name, date:'YYYY-MM-DD', timestamp}
+  let lockOrder=false; // NEW
+
+  /* Utils */
+  const $=s=>document.querySelector(s);
+  const uid=()=> "p"+Math.random().toString(36).slice(2)+Date.now().toString(36);
+  const clampInt=(v,d=0)=>Number.isFinite(+v)?Math.trunc(+v):d;
+  const initials=(n)=> (n||" ").trim().split(/\s+/).map(s=>s[0]).join("").slice(0,2).toUpperCase();
+  const csv=s=>(/[",\n]/.test(s)?`"`+String(s).replace(/"/g,'""')+`"`:String(s));
+  const todayStr=()=> new Date().toISOString().slice(0,10);
+  const pruneWins=()=>{ const cutoff=Date.now()-7*24*3600*1000; winsLog = (winsLog||[]).filter(w=>w.timestamp>=cutoff); };
+  function toast(msg){ const t=document.createElement('div'); t.className='toast'; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>{ t.remove(); },1400); }
+
+  function resetViewportScaleIfZoomed(){
+    try{
+      if (window.visualViewport && visualViewport.scale > 1){
+        const vp = document.querySelector('meta[name="viewport"]');
+        const base = 'width=device-width, initial-scale=1';
+        vp.setAttribute('content', base + ', user-scalable=no, maximum-scale=1');
+        setTimeout(()=> vp.setAttribute('content', base + ', user-scalable=yes, maximum-scale=5'), 60);
+      }
+    }catch{}
+  }
+
+  /* Save / Load */
+  const save=()=>{localStorage.setItem(storageKey, JSON.stringify({players,limit,nextDealerId,autoAdvanceDealer,gameOver,cutsHistory,roundCounter,rounds,winsLog,lockOrder}));};
+  const load=()=>{try{
+      const s=JSON.parse(localStorage.getItem(storageKey)||"{}");
+      players = s.players || [];
+      limit   = Number.isFinite(s.limit) ? s.limit : 100;
+      autoAdvanceDealer = (typeof s.autoAdvanceDealer === "boolean") ? s.autoAdvanceDealer : true;
+      nextDealerId = (typeof s.nextDealerId==="string") ? s.nextDealerId : (players[0]?.id ?? null);
+      gameOver = !!s.gameOver;
+      cutsHistory = s.cutsHistory || [];
+      roundCounter = s.roundCounter || 0;
+      rounds = s.rounds || [];
+      winsLog = s.winsLog || [];
+      lockOrder = !!s.lockOrder;
+      pruneWins();
+    }catch{} 
+  };
+
+  /* Render */
+  const list=$("#playersList"), rowTpl=document.getElementById("playerRowTpl");
+  function render(){
+    $("#limitInput").value=limit;
+    $("#autoAdvance").checked=autoAdvanceDealer;
+    $("#lockOrderSwitch").checked=lockOrder;
+    $("#nextDealerName").textContent=players.find(p=>p.id===nextDealerId)?.name||"—";
+    $("#banner").style.display=gameOver?"":"none";
+    const lockBtn=$("#lockToggle"); if(lockBtn){ lockBtn.textContent = lockOrder ? "🔒" : "🔓"; lockBtn.title = lockOrder ? "Unlock player order" : "Lock player order"; lockBtn.setAttribute("aria-label", lockBtn.title); }
+
+    list.innerHTML="";
+    players.forEach((p,i)=>{
+      const n=rowTpl.content.firstElementChild.cloneNode(true);
+      n.dataset.index=i; n.dataset.id=p.id;
+
+      // Drag enable/disable based on lock
+      n.draggable = !lockOrder;
+
+      if(!lockOrder){
+        n.addEventListener("dragstart",dragStart);
+        n.addEventListener("dragover",dragOver);
+        n.addEventListener("drop",drop);
+        n.addEventListener("dragend",dragEnd);
+      }
+
+      // Long-press to EDIT (whole row)
+      attachLongPress(n, ()=>openEdit(p.id));
+
+      if(p.id===nextDealerId) n.classList.add("dealer"); else n.classList.remove("dealer");
+
+      const avatarBox=n.querySelector(".avatar");
+      avatarBox.innerHTML = p.avatar ? `<img alt="" src="${p.avatar}">` : `<span class="initials">${initials(p.name||"")}</span>`;
+
+      n.querySelector(".playerName").textContent=p.name||"—";
+      const r = clampInt(p.reenganches||0,0);
+      n.querySelector(".stars").textContent = r>0 ? (r===1 ? "★" : `★ ${r}`) : "";
+      const sv=n.querySelector(".scoreVal"); sv.textContent=clampInt(p.score||0);
+      const scWrap=n.querySelector(".score"); if((p.score||0)>=limit+1) scWrap.classList.add("over"); else scWrap.classList.remove("over");
+
+      // Drag handle visuals + locked tap hint
+      const handle=n.querySelector(".drag");
+      if(lockOrder){ handle.classList.add("locked"); handle.onclick=()=>toast("Order locked"); }
+      else { handle.classList.remove("locked"); handle.onclick=null; }
+
+      list.appendChild(n);
+    });
+    $("#newRoundBtn").disabled=players.length===0||gameOver;
+    save();
+  }
+
+  /* Long-press */
+  function attachLongPress(el, cb){
+    let tmr, moved=false;
+    const start = ()=>{ moved=false; tmr=setTimeout(()=>{ if(!moved) cb(); },600); };
+    const end = ()=>{ clearTimeout(tmr); };
+    el.addEventListener('touchstart', start, {passive:true});
+    el.addEventListener('mousedown', start);
+    el.addEventListener('touchmove', ()=>{ moved=true; }, {passive:true});
+    ['touchend','touchcancel','mouseup','mouseleave'].forEach(ev=>el.addEventListener(ev, end));
+  }
+
+  /* Drag & drop */
+  let dragIdx=null;
+  const dragStart=e=>{dragIdx=+e.currentTarget.dataset.index; e.dataTransfer.effectAllowed="move"; e.dataTransfer.setData("text/plain", String(dragIdx)); e.currentTarget.setAttribute("aria-grabbed","true");};
+  const dragOver=e=>{e.preventDefault(); e.dataTransfer.dropEffect="move";};
+  const drop=e=>{e.preventDefault(); const from=dragIdx??+e.dataTransfer.getData("text/plain"); const to=+e.currentTarget.dataset.index; if(Number.isInteger(from)&&Number.isInteger(to)&&from!==to){ const arr=players.slice(); const [m]=arr.splice(from,1); arr.splice(to,0,m); const keep=nextDealerId; players=arr; nextDealerId=keep; render(); }};
+  const dragEnd=e=>{e.currentTarget.setAttribute("aria-grabbed","false"); dragIdx=null;};
+
+  /* Dealer helpers */
+  const setDealer=id=>{ if(players.some(p=>p.id===id)){ nextDealerId=id; render(); } };
+  const advanceDealer=()=>{ if(!players.length||!nextDealerId) return; const i=players.findIndex(p=>p.id===nextDealerId); nextDealerId=players[(i>=0&&i<players.length-1)?i+1:0].id; };
+
+  /* CRUD */
+  const addPlayer=(name="")=>{ const p={id:uid(), name:name||`Player ${players.length+1}`, score:0, reenganches:0, avatar:null}; players.push(p); if(!nextDealerId) nextDealerId=p.id; gameOver=false; render(); };
+  const removePlayer=id=>{ const i=players.findIndex(p=>p.id===id); if(i<0) return; const was=players[i].id===nextDealerId; players.splice(i,1); if(!players.length) nextDealerId=null; else if(was) nextDealerId=players[Math.min(i,players.length-1)].id; render(); };
+
+  /* Photo + cropper */
+  const photoInput=document.getElementById("photoInput"); let photoTarget=null;
+  photoInput.removeAttribute('capture');
+  photoInput.addEventListener("change", async()=>{
+    if(!photoTarget||!photoInput.files?.[0]) return;
+    const file=photoInput.files[0];
+    const dataUrl=await new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=rej; r.readAsDataURL(file); });
+    openCropper(dataUrl, photoTarget);
+    photoTarget=null;
+  });
+
+  /* Edit dialog */
+  const editDlg=document.getElementById("editDialog"), editForm=document.getElementById("editForm");
+  const setDealerSwitch = ()=>document.getElementById("setDealerSwitch");
+  function openEdit(id){
+    const p=players.find(x=>x.id===id); if(!p) return;
+    $("#editId").value=p.id;
+    $("#editName").value=p.name||"";
+    $("#editScore").value=clampInt(p.score||0);
+    $("#editReeng").value=clampInt(p.reenganches||0);
+    setDealerSwitch().checked = (p.id === nextDealerId);
+
+    document.getElementById("changePhotoBtn").onclick = ()=>{ photoTarget=p.id; photoInput.value=""; photoInput.click(); };
+    document.getElementById("removePhotoBtn").onclick = ()=>{ p.avatar=null; render(); };
+    document.getElementById("viewHistoryBtn").onclick = ()=> openHistory(p.id);
+    document.getElementById("deletePlayerBtn").onclick = ()=>{
+      if(confirm("Delete this player? This cannot be undone.")){ editDlg.close(); removePlayer(p.id); setTimeout(resetViewportScaleIfZoomed,80); }
+    };
+    editDlg.showModal();
+  }
+  editForm.addEventListener("submit", (e)=>{
+    e.preventDefault();
+    const id=$("#editId").value; const p=players.find(x=>x.id===id); if(!p) return editDlg.close();
+    p.name = String($("#editName").value||"").trim() || p.name;
+    p.score = clampInt($("#editScore").value, p.score);
+    p.reenganches = Math.max(0, clampInt($("#editReeng").value, p.reenganches));
+    if (setDealerSwitch().checked) nextDealerId = p.id;
+    editDlg.close(); render(); setTimeout(resetViewportScaleIfZoomed,80);
+  });
+
+  /* Round dialog + logic */
+  const roundDlg=document.getElementById("roundDialog"), rows=document.getElementById("roundRows"), cutters=document.getElementById("cuttersGroup"), rErr=document.getElementById("roundError"), applyBtn=document.getElementById("applyRoundBtn");
+  const openRound=()=>{ rows.innerHTML=""; cutters.innerHTML="";
+    players.forEach(p=>{ const r=document.createElement("div"); r.className="round-row";
+      const name=document.createElement("div"); name.innerHTML=`<strong>${p.name}</strong><div class="hint">Current: ${p.score||0}</div>`;
+      const inp=document.createElement("input"); inp.id="rr_"+p.id; inp.type="number"; inp.step="1"; inp.inputMode="numeric"; inp.placeholder="0"; inp.dataset.pid=p.id; inp.addEventListener("input", validateRound);
+      const minus=document.createElement("button"); minus.type="button"; minus.className="minus10"; minus.textContent="−10"; minus.onclick=()=>{ inp.value=clampInt((inp.value===""?0:+inp.value)-10); validateRound(); };
+      const cut=document.createElement("div"); cut.className="r-cutter"; cut.innerHTML=`<input type="radio" name="cutter" value="${p.id}" aria-label="Cutter ${p.name}">`;
+      cut.querySelector("input").addEventListener("change", validateRound);
+      r.append(name,inp,minus,cut); rows.appendChild(r);
+
+      const chip=document.createElement("label"); chip.style.cssText="display:inline-flex;align-items:center;gap:8px;border:1px dashed rgba(255,255,255,.2);padding:6px 10px;border-radius:999px;cursor:pointer;"; chip.innerHTML=`<input class="visually-hidden" type="radio" name="cutter" value="${p.id}"><span>✂️ ${p.name}</span>`; chip.querySelector("input").addEventListener("change", validateRound); cutters.appendChild(chip);
+    });
+    const none=document.createElement("label"); none.style.cssText="display:inline-flex;align-items:center;gap:8px;border:1px dashed rgba(255,255,255,.2);padding:6px 10px;border-radius:999px;cursor:pointer;"; none.innerHTML=`<input class="visually-hidden" type="radio" name="cutter" value="" checked><span>—</span>`; none.querySelector("input").addEventListener("change", validateRound); cutters.insertBefore(none, cutters.firstChild);
+    rErr.style.display="none"; applyBtn.disabled=false; roundDlg.showModal(); };
+  const roundInputs=()=>{ const m={}; players.forEach(p=>{ const el=document.getElementById("rr_"+p.id); m[p.id]=clampInt(el?.value??0,0); }); return m; };
+  const selectedCutter=()=>{ const sel=document.querySelector('input[name="cutter"]:checked'); const v=sel?sel.value:""; return v||null; };
+  function validateRound(){ const inputs=roundInputs(); const cid=selectedCutter(); if(!cid){ rErr.style.display="none"; applyBtn.disabled=false; return true; } const c=players.find(p=>p.id===cid); if(!c){ rErr.textContent="Invalid cutter selected."; rErr.style.display=""; applyBtn.disabled=true; return false; } const proj=clampInt(c.score||0)+clampInt(inputs[c.id]??0); if(proj>limit){ rErr.textContent=`Cutter cannot exceed ${limit}. (Projected: ${proj})`; rErr.style.display=""; applyBtn.disabled=true; return false; } rErr.style.display="none"; applyBtn.disabled=false; return true; }
+
+  function snapshotTotalsById() { const o = {}; players.forEach(p => { o[p.id] = clampInt(p.score||0); }); return o; }
+
+  function applyRound(inputs,cid){
+    const snapshotInputs = JSON.parse(JSON.stringify(inputs));
+    const roundNo = roundCounter + 1;
+
+    // Projected totals
+    const proj=new Map(); players.forEach(p=>{ proj.set(p.id, clampInt(p.score||0)+clampInt(inputs[p.id]??0)); });
+
+    roundCounter += 1;
+    if (cid){
+      const cutter = players.find(p=>p.id===cid);
+      cutsHistory.push({ id: cid, name: cutter?.name||"—", round: roundCounter, timestamp: Date.now(), result: "played" });
+    }
+
+    const under = players.filter(p => (proj.get(p.id) ?? p.score) <= limit);
+    const over  = players.filter(p => (proj.get(p.id) ?? p.score) >= (limit+1));
+
+    // Immediate win if only one player remains ≤100
+    if (under.length === 1){
+      players.forEach(p=>{ p.score = proj.get(p.id); });
+      gameOver = true;
+
+      // wins log
+      const winner = under[0];
+      winsLog.push({ playerId:winner.id, name:winner.name, date:todayStr(), timestamp:Date.now() });
+      pruneWins();
+
+      if (cid){
+        const last = cutsHistory.slice().reverse().find(h => h.round===roundCounter && h.id===cid);
+        if (last) last.result = (cid === winner.id) ? "cut_win" : "normal";
+      }
+
+      rounds.push({round:roundNo, inputs:snapshotInputs, totals:snapshotTotalsById(), cutterId:cid, timestamp:Date.now()});
+      roundDlg.close(); showWinOverlay(winner);
+      save(); render(); return;
+    }
+
+    // Reenganche only if there are at least two players ≤100
+    if (under.length >= 2 && over.length){
+      const maxUnderVal = Math.max(...under.map(p => proj.get(p.id)));
+      players.forEach(p=>{
+        let val = proj.get(p.id);
+        if (val >= (limit+1)){
+          proj.set(p.id, maxUnderVal);
+          p.reenganches = (p.reenganches||0) + 1;
+        }
+      });
+    }
+
+    // Apply totals
+    players.forEach(p=>{ p.score=proj.get(p.id); });
+
+    if(autoAdvanceDealer) advanceDealer();
+
+    if (cid){
+      const last = cutsHistory.slice().reverse().find(h => h.round===roundCounter && h.id===cid);
+      if (last && last.result==="played") last.result="normal";
+    }
+
+    rounds.push({round:roundNo, inputs:snapshotInputs, totals:snapshotTotalsById(), cutterId:cid, timestamp:Date.now()});
+    gameOver=false; render();
+  }
+
+  /* CSV */
+  const exportCSV=()=>{ const header=["name","score","reenganches","isDealer"]; const rows=players.map(p=>[csv(p.name||""), String(clampInt(p.score||0)), String(clampInt(p.reenganches||0)), String(p.id===nextDealerId)]); const all=[header].concat(rows).map(r=>r.join(",")).join("\n"); const blob=new Blob(["\ufeff",all],{type:"text/csv;charset=utf-8"}); const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="conga_scores.csv"; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();},0); };
+
+  /* Player cut history */
+  function openHistory(id){
+    const list=$("#historyList"); list.innerHTML="";
+    const my=(cutsHistory||[]).filter(h=>h.id===id).sort((a,b)=>a.round-b.round);
+    if(my.length===0){ list.innerHTML='<div class="history-item">No cuts recorded.</div>'; }
+    else{
+      for(const h of my){
+        const d=new Date(h.timestamp);
+        const label=h.result==='cut_win'?'✂️🏆 Cut win':(h.result==='normal'?'✂️ Cut (no win)':'✂️ Cut');
+        const row=document.createElement('div'); row.className='history-item'; row.textContent=`R${h.round} • ${label} • ${d.toLocaleString()}`;
+        list.appendChild(row);
+      }
+    }
+    historyDialog.showModal();
+  }
+
+  /* Rounds history (current game only) */
+  function openRoundsTable(){
+    const wrap=$("#roundsTableWrap"); wrap.innerHTML="";
+    if(!rounds.length){ wrap.innerHTML='<div class="history-item">No rounds yet.</div>'; roundsDialog.showModal(); return; }
+    const table=document.createElement('table');
+
+    // Fit up to 4 players; then scroll
+    const colWidth = 110;
+    const totalW = 32 + Math.max(4, players.length) * colWidth;
+    table.style.width = Math.max(520, totalW) + "px";
+
+    const thead=document.createElement('thead'); const trh=document.createElement('tr');
+    const th0=document.createElement('th'); th0.textContent="#"; trh.appendChild(th0);
+    players.forEach(p=>{ const th=document.createElement('th'); th.textContent=p.name; trh.appendChild(th); });
+    thead.appendChild(trh); table.appendChild(thead);
+
+    const tbody=document.createElement('tbody');
+    rounds.forEach(r=>{
+      const tr=document.createElement('tr');
+      const th=document.createElement('th'); th.textContent=String(r.round); tr.appendChild(th);
+      const showTotals = r.totals && typeof r.totals === 'object';
+      players.forEach(p=>{
+        const td=document.createElement('td'); const v=showTotals?r.totals[p.id]:r.inputs[p.id]; td.textContent=Number.isFinite(v)?v:""; tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    wrap.appendChild(table);
+    roundsDialog.showModal();
+  }
+
+  /* Wins (7d) */
+  function openWins(){
+    pruneWins();
+    const wrap=$("#winsWrap"); wrap.innerHTML="";
+    if(!winsLog.length){ wrap.innerHTML='<div class="history-item">No wins logged in the last 7 days.</div>'; winsDialog.showModal(); return; }
+    // Group by date then player
+    const map=new Map();
+    for(const w of winsLog){
+      if(!map.has(w.date)) map.set(w.date, new Map());
+      const m=map.get(w.date);
+      m.set(w.name, (m.get(w.name)||0)+1);
+    }
+    // Render
+    [...map.entries()].sort((a,b)=>a[0]<b[0]?1:-1).forEach(([date, m])=>{
+      const div=document.createElement('div'); div.className='history-item';
+      const list=[...m.entries()].sort((a,b)=>b[1]-a[1]).map(([n,c])=>`${n}: ${c}`).join(' • ');
+      div.textContent=`${date} — ${list}`; wrap.appendChild(div);
+    });
+    winsDialog.showModal();
+  }
+
+  /* Win overlay + confetti */
+  const winOverlay=document.getElementById('winOverlay');
+  const winNameEl=document.getElementById('winName');
+  const winPhotoEl=document.getElementById('winPhoto');
+  const winSubEl=document.getElementById('winSubtitle');
+  const winCloseBtn=document.getElementById('winCloseBtn');
+  const winSound=document.getElementById('winSound');
+  const confettiCanvas=document.getElementById('confettiCanvas');
+  let confettiAnim, onResize;
+
+  function showWinOverlay(winner){
+    winNameEl.textContent = winner?.name || "Winner";
+    winSubEl.textContent = "Game over";
+    winPhotoEl.src = winner?.avatar || 'icons/icon-512.png';
+    winOverlay.style.display='flex';
+    startConfetti();
+    try{winSound.currentTime=0; winSound.play().catch(()=>{});}catch{}
+  }
+  function hideWinOverlay(){ winOverlay.style.display='none'; stopConfetti(); }
+  winCloseBtn.addEventListener('click', hideWinOverlay);
+  winOverlay.addEventListener('click', (e)=>{ if(e.target===winOverlay) hideWinOverlay(); });
+
+  function startConfetti(){
+    const ctx = confettiCanvas.getContext('2d');
+    const DPR = Math.max(1, window.devicePixelRatio||1);
+    const resize = ()=>{ confettiCanvas.width = confettiCanvas.clientWidth*DPR;
+                         confettiCanvas.height = confettiCanvas.clientHeight*DPR; };
+    resize(); onResize = resize; window.addEventListener('resize', onResize);
+
+    const W = ()=>confettiCanvas.width, H = ()=>confettiCanvas.height;
+    const colors = ['#FFD166','#06D6A0','#118AB2','#EF476F','#A78BFA','#FF9F1C','#2EC4B6'];
+
+    const confetti = Array.from({length:220},()=>({
+      x: Math.random()*W(), y: -Math.random()*H(), r: 2+Math.random()*4,
+      c: colors[(Math.random()*colors.length)|0],
+      vx: -1 + Math.random()*2, vy: 1 + Math.random()*2.8,
+      a: Math.random()*Math.PI*2, va: -0.2+Math.random()*0.4
+    }));
+
+    (function loop(){
+      const w=W(), h=H();
+      ctx.clearRect(0,0,w,h);
+      for(const p of confetti){
+        p.x += p.vx; p.y += p.vy; p.a += p.va;
+        if(p.y > h+20){ p.y = -10; p.x = Math.random()*w; }
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.a);
+        ctx.fillStyle = p.c; ctx.fillRect(-p.r, -p.r, p.r*2, p.r*2);
+        ctx.restore();
+      }
+      confettiAnim = requestAnimationFrame(loop);
+    })();
+  }
+  function stopConfetti(){ cancelAnimationFrame(confettiAnim); window.removeEventListener('resize', onResize||(()=>{})); }
+
+  /* Cropper */
+  const cropDialog=document.getElementById('cropDialog');
+  const cropCanvas=document.getElementById('cropCanvas');
+  const cropCtx=cropCanvas.getContext('2d');
+  const cropZoom=document.getElementById('cropZoom');
+  const cropResetBtn=document.getElementById('cropReset');
+  const cropSaveBtn=document.getElementById('cropSave');
+  let cropImg=new Image(), cropTargetId=null, cx=0, cy=0, scale=1, isPanning=false, lastX=0, lastY=0, pinchStartDist=null, startScale=1;
+
+  function openCropper(dataUrl, targetId){
+    cropTargetId=targetId; cropImg=new Image();
+    cropImg.onload=()=>{ scale=1; cx=0; cy=0; cropZoom.value='1'; drawCrop(); cropDialog.showModal(); };
+    cropImg.src=dataUrl;
+  }
+  function drawCrop(){
+    const W=cropCanvas.width,H=cropCanvas.height; cropCtx.clearRect(0,0,W,H);
+    cropCtx.save(); cropCtx.translate(W/2+cx, H/2+cy); cropCtx.scale(scale, scale);
+    const ratio=Math.min(W/cropImg.width, H/cropImg.height); const w=cropImg.width*ratio, h=cropImg.height*ratio;
+    cropCtx.drawImage(cropImg, -w/2, -h/2, w, h); cropCtx.restore();
+    cropCtx.save(); cropCtx.fillStyle="rgba(0,0,0,.35)"; cropCtx.beginPath(); cropCtx.rect(0,0,W,H); cropCtx.arc(W/2,H/2,Math.min(W,H)*0.42,0,Math.PI*2,true); cropCtx.fill("evenodd"); cropCtx.restore();
+    cropCtx.beginPath(); cropCtx.strokeStyle="rgba(255,255,255,.85)"; cropCtx.lineWidth=3; cropCtx.arc(W/2,H/2,Math.min(W,H)*0.42,0,Math.PI*2); cropCtx.stroke();
+  }
+  cropCanvas.addEventListener('mousedown', e=>{ isPanning=true; lastX=e.offsetX; lastY=e.offsetY; });
+  window.addEventListener('mouseup', ()=>{ isPanning=false; });
+  cropCanvas.addEventListener('mousemove', e=>{ if(!isPanning) return; cx+=(e.offsetX-lastX); cy+=(e.offsetY-lastY); lastX=e.offsetX; lastY=e.offsetY; drawCrop(); });
+  cropCanvas.addEventListener('touchstart', e=>{ if(e.touches.length===2){ pinchStartDist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY); startScale=scale; } else { isPanning=true; lastX=e.touches[0].clientX; lastY=e.touches[0].clientY; }},{passive:false});
+  cropCanvas.addEventListener('touchmove', e=>{ e.preventDefault(); if(e.touches.length===2 && pinchStartDist){ const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY); scale=Math.min(3,Math.max(0.6, startScale*(d/pinchStartDist))); cropZoom.value=String(scale); drawCrop(); } else if(isPanning){ const x=e.touches[0].clientX,y=e.touches[0].clientY; cx+=(x-lastX); cy+=(y-lastY); lastX=x; lastY=y; drawCrop(); }},{passive:false});
+  cropCanvas.addEventListener('touchend', ()=>{ isPanning=false; pinchStartDist=null; }, {passive:true});
+  cropZoom.addEventListener('input', ()=>{ scale=+cropZoom.value; drawCrop(); });
+  cropResetBtn.addEventListener('click', ()=>{ scale=1; cx=0; cy=0; cropZoom.value='1'; drawCrop(); });
+  cropSaveBtn.addEventListener('click', ()=>{
+    // Output smaller JPEG (~320x320) with background matching app
+    const W=cropCanvas.width,H=cropCanvas.height; const R=Math.min(W,H)*0.42;
+    const out=document.createElement('canvas'); out.width=out.height=320;
+    const octx=out.getContext('2d');
+
+    // Fill background to avoid black corners in JPEG
+    octx.fillStyle='#0f1428'; octx.fillRect(0,0,out.width,out.height);
+
+    // Draw circular crop centered into the 320 canvas
+    octx.save();
+    octx.beginPath(); octx.arc(out.width/2, out.height/2, out.width/2 - 2, 0, Math.PI*2); octx.clip();
+    // Re-render the working crop into this output at appropriate scale
+    // Compute current visual crop frame back to image space
+    // We reuse same math as preview: scale + translate relative to a square frame
+    const ratio=Math.min(W/cropImg.width, H/cropImg.height);
+    const iw=cropImg.width*ratio, ih=cropImg.height*ratio;
+    // Position image such that what's visible in preview also appears here
+    // Map: output center <- preview center + offsets
+    octx.translate(out.width/2 + (cx*(out.width/W)), out.height/2 + (cy*(out.height/H)));
+    octx.scale(scale*(out.width/W), scale*(out.height/H));
+    octx.drawImage(cropImg, -iw/2, -ih/2, iw, ih);
+    octx.restore();
+
+    const dataURL=out.toDataURL('image/jpeg',0.85);
+    const p=players.find(x=>x.id===cropTargetId); if(p){ p.avatar=dataURL; render(); }
+    cropDialog.close();
+  });
+
+  /* Backup / Restore */
+  function doBackup(){
+    const payload = {
+      v: 1,
+      savedAt: new Date().toISOString(),
+      players, limit, nextDealerId, autoAdvanceDealer, rounds, winsLog, cutsHistory, roundCounter, lockOrder
+    };
+    const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(blob);
+    a.download="conga_backup.json";
+    document.body.appendChild(a); a.click();
+    setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();},0);
+  }
+  async function doRestore(file){
+    try{
+      const text = await file.text();
+      const data = JSON.parse(text);
+      if(!data || !Array.isArray(data.players)) throw new Error("Invalid file");
+      players = data.players; limit = Number.isFinite(data.limit)? data.limit : limit;
+      nextDealerId = typeof data.nextDealerId==="string" ? data.nextDealerId : nextDealerId;
+      autoAdvanceDealer = typeof data.autoAdvanceDealer==="boolean" ? data.autoAdvanceDealer : autoAdvanceDealer;
+      rounds = Array.isArray(data.rounds) ? data.rounds : [];
+      winsLog = Array.isArray(data.winsLog) ? data.winsLog : [];
+      cutsHistory = Array.isArray(data.cutsHistory) ? data.cutsHistory : [];
+      roundCounter = Number.isFinite(data.roundCounter) ? data.roundCounter : 0;
+      lockOrder = !!data.lockOrder;
+      pruneWins();
+      render();
+      toast("Backup restored");
+    }catch(e){
+      toast("Restore failed");
+      console.error(e);
+    }
+  }
+
+  /* Rounds history (table), Wins, Cut history already above */
+
+  /* Win overlay helpers (already above) */
+
+  /* Wire-up UI */
+  const settingsDialog=document.getElementById("settingsDialog");
+  document.getElementById("openSettings").onclick=()=>settingsDialog.showModal();
+  document.getElementById("historyBtn").onclick=openRoundsTable;
+  document.getElementById("winsBtn").onclick=openWins;
+  document.getElementById("backupBtn").onclick=doBackup;
+  const importInput=$("#importJsonInput");
+  document.getElementById("restoreBtn").onclick=()=>{ importInput.value=""; importInput.click(); };
+  importInput.addEventListener("change", ()=>{ const f=importInput.files?.[0]; if(f) doRestore(f); });
+
+  // Header quick lock toggle
+  document.getElementById("lockToggle").onclick=()=>{ lockOrder=!lockOrder; render(); };
+
+  // Settings toggles
+  $("#limitInput").oninput=e=>{ const v=clampInt(e.target.value,limit); limit=Math.max(1,v); render(); };
+  $("#autoAdvance").onchange=e=>{ autoAdvanceDealer=!!e.target.checked; render(); };
+  $("#lockOrderSwitch").onchange=e=>{ lockOrder=!!e.target.checked; render(); };
+
+  // Other actions
+  document.getElementById("addPlayerBtn").onclick=()=>{ const name=prompt("Player name?"); if(name!==null) addPlayer(String(name).trim()||undefined); };
+  document.getElementById("newRoundBtn").onclick=()=>openRound();
+  document.getElementById("exportBtn").onclick=exportCSV;
+
+  $("#resetScoresBtn").onclick=()=>{ if(players.length&&confirm("Reset all scores and reenganches?")){ players.forEach(p=>{p.score=0;p.reenganches=0;}); gameOver=false; render(); } };
+  $("#clearAllBtn").onclick=()=>{ if(confirm("Clear all players and settings?")){ players=[]; limit=100; nextDealerId=null; autoAdvanceDealer=true; gameOver=false; cutsHistory=[]; rounds=[]; roundCounter=0; winsLog=[]; render(); } };
+
+  // New game resets only the current game's history
+  $("#newGameBtn").onclick=()=>{ players.forEach(p=>{p.score=0;p.reenganches=0;}); gameOver=false; rounds=[]; roundCounter=0; render(); window.scrollTo({top:0,behavior:"smooth"}); };
+
+  document.getElementById("roundForm").onsubmit=e=>{ e.preventDefault(); if(!validateRound()) return;
+    const inputs=roundInputs(); const cid=selectedCutter();
+    if(cid){
+      const p=players.find(x=>x.id===cid);
+      const projected=clampInt(p.score||0)+clampInt(inputs[p.id]??0);
+      if(projected>limit){ $("#roundError").textContent=`Cutter cannot exceed ${limit}. (Projected: ${projected})`; $("#roundError").style.display=""; return; }
+    }
+    roundDlg.close(); applyRound(inputs,cid); setTimeout(resetViewportScaleIfZoomed,80);
+  };
+
+  /* Init */
+  load();
+  if(players.length===0){
+    addPlayer("Player 1");
+    addPlayer("Player 2");
+  } else {
+    render();
+  }
+
+  /* SW safe-register */
+  if('serviceWorker' in navigator){
+    window.addEventListener('load', ()=>{
+      navigator.serviceWorker.register('service-worker.js').catch(()=>{ /* ignore */ });
+    });
+  }
+})();
+</script>
+</body>
+</html>
