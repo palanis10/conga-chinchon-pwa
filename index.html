@@ -57,22 +57,20 @@
   /* Players */
   .players header{ margin:0 0 6px 2px; color:var(--sub); font-size:12px; }
 
-  /* iOS-safe player grid: explicit columns so last cells don't collapse */
+  /* SAFARI-PROOF GRID */
   .row{
     display:grid;
-    grid-template-columns: 44px 54px minmax(0,1fr) minmax(150px,auto) 44px; /* drag | avatar | name | star+score | edit */
-    align-items:center; gap:8px;
-    padding:8px 10px; border-radius:14px;
+    grid-template-columns: 28px 54px 1fr auto auto; /* drag | avatar | name | star+score | edit */
+    align-items:center; gap:10px;
+    padding:10px; border-radius:14px;
     border:1px solid rgba(255,255,255,.06);
     background: linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,0));
     margin-bottom:8px;
-    min-height:84px;
+    min-height:86px;
     touch-action:manipulation;
   }
-  .drag{
-    cursor:grab; text-align:center; font-size:18px; color:var(--sub);
-    width:44px; height:44px; display:grid; place-items:center;
-  }
+  .drag{ cursor:grab; text-align:center; font-size:18px; color:var(--sub); }
+
   .row.dealer{ border-color: rgba(78,225,160,.55); box-shadow: 0 0 0 2px rgba(78,225,160,.22) inset; }
 
   .avatar{
@@ -90,22 +88,20 @@
   .stars{ color:var(--danger); font-weight:900; font-size:18px; white-space:nowrap; margin-right:6px }
 
   .scorewrap{
-    justify-self:end; display:flex; align-items:center; gap:8px;
-    min-width:150px; /* keeps space for ★ 99 and big scores on Safari */
-    margin-right:4px;
+    display:flex; align-items:center; gap:8px;
+    white-space:nowrap; /* keep ★ 10 + 99 tight */
   }
   .score{ font-variant-numeric: tabular-nums; font-weight:900; text-align:right; font-size: clamp(22px, 5.2vw, 28px); }
   .score.over{ color:var(--danger) }
 
-  .actions{ display:flex; gap:4px; justify-content:flex-end; align-items:center; }
+  .actions{ display:flex; gap:6px; align-items:center; }
   .actions .iconbtn{ width:40px; height:40px; font-size:16px; }
 
-  /* Banner (game over) */
+  /* Dialogs, banners, cropper, etc. (unchanged below) */
   .banner{ margin:10px 0; padding:10px 12px; border-radius:14px; border:1px solid rgba(255,255,255,.1);
     background: linear-gradient(90deg, rgba(78,225,160,.15), rgba(122,162,255,.1)); color:#d7fff0; display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; }
   .banner .tag{ background:#0f1428; border:1px solid rgba(255,255,255,.08); padding:4px 8px; border-radius:999px; font-size:12px; color:#b8c0ff }
 
-  /* Dialogs */
   dialog{ width:min(720px, 96vw); border-radius:16px; border:1px solid rgba(255,255,255,.12);
     background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01)) , #0f1428; color:var(--text);
     box-shadow: 0 24px 64px rgba(0,0,0,.55); }
@@ -118,13 +114,10 @@
   input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0;}
   .switch{display:flex; align-items:center; gap:10px; background:#0f1428; border:1px solid var(--muted); padding:8px 10px; border-radius:12px; height:38px;}
 
-  /* Round dialog – compact rows */
   .grid-rows{ display:grid; gap:6px }
-  .round-row{
-    display:grid; grid-template-columns: 1fr 100px 56px 36px; gap:8px; align-items:center;
+  .round-row{ display:grid; grid-template-columns: 1fr 100px 56px 36px; gap:8px; align-items:center;
     padding:6px; border:1px dashed rgba(255,255,255,.15); border-radius:12px;
-    background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.00));
-  }
+    background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.00)); }
   .round-row input[type="number"]{ height:34px; padding:6px 8px; }
   .round-row .minus10{ width:100%; height:34px; border-radius:10px; border:1px solid rgba(255,255,255,.12);
     background:linear-gradient(135deg, #1c243e, #121a34); color:var(--text); font-weight:800; padding:0 4px; }
@@ -134,7 +127,6 @@
   .error{ color:var(--danger); font-weight:700; margin-right:auto }
   .hint{ color:var(--sub); font-size:12px }
 
-  /* WIN OVERLAY */
   .win-overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(5,8,20,.55); z-index: 9999; padding: 16px; }
   .win-card { width: min(560px, 94vw); border-radius: 20px; padding: 14px; border: 1px solid rgba(255,255,255,.12); background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02)), #0f1428; box-shadow: 0 24px 64px rgba(0,0,0,.55); position: relative; overflow: hidden; }
   .win-head { display:flex; align-items:center; gap:12px; }
@@ -145,16 +137,13 @@
   #confettiCanvas { position:absolute; inset:0; pointer-events:none; }
   .win-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:10px; flex-wrap:wrap; }
 
-  /* CROP MODAL */
   #cropDialog canvas { width: 100%; height: auto; background:#0e1326; border-radius:12px; border:1px solid rgba(255,255,255,.12); touch-action: none; }
   .crop-controls { display:flex; gap:10px; align-items:center; justify-content:space-between; margin-top:10px; }
   .crop-frame-hint { color:#b8c0ff; font-size:12px; }
 
-  /* CUT HISTORY */
   .history-list { display:grid; gap:8px; max-height:50vh; overflow:auto; }
   .history-item { padding:8px; border-radius:10px; border:1px solid rgba(255,255,255,.08); background:rgba(255,255,255,.02); }
 
-  /* Rounds table */
   .table-wrap{ overflow:auto; max-height:60vh; border:1px solid rgba(255,255,255,.12); border-radius:12px;}
   table{ width:max(520px,100%); border-collapse:separate; border-spacing:0; }
   thead th{ position:sticky; top:0; background:#121633; border-bottom:1px solid rgba(255,255,255,.12); padding:10px; text-align:center; font-weight:800;}
@@ -417,7 +406,7 @@
   };
 
   /* State */
-  const storageKey="conga_state_ui_rev4";
+  const storageKey="conga_state_ui_rev5";
   let players=[], limit=100, nextDealerId=null, autoAdvanceDealer=true, gameOver=false;
   let cutsHistory=[]; let roundCounter=0; let rounds=[];
 
@@ -472,12 +461,10 @@
 
       n.querySelector(".playerName").textContent=p.name||"—";
 
-      // ★ near score
       const sEl=n.querySelector(".stars");
       const r = clampInt(p.reenganches||0,0);
       sEl.textContent = r>0 ? (r===1 ? "★" : `★ ${r}`) : "";
 
-      // Score – red only when >= limit+1
       const sv=n.querySelector(".scoreVal"); sv.textContent=clampInt(p.score||0);
       const scWrap=n.querySelector(".score"); if((p.score||0) >= (limit+1)) scWrap.classList.add("over"); else scWrap.classList.remove("over");
 
