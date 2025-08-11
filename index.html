@@ -26,19 +26,19 @@
   }
   .app{max-width:980px; margin:0 auto; padding: calc(8px + env(safe-area-inset-top, 0px)) 12px 120px;}
 
-  /* Top bar (grid so buttons never fall between title lines) */
+  /* Top bar → 2 rows (title row, then actions row) */
   header.topbar{
-    display:grid; grid-template-columns: 1fr auto; align-items:center; gap:12px;
+    display:flex; flex-direction:column; gap:8px;
     margin:2px 0 8px 0;
   }
-  .top-left{min-width:0; display:flex; align-items:center; gap:10px}
+  .top-left{display:flex; align-items:center; gap:10px; min-width:0}
   .chip{
     background:linear-gradient(135deg, var(--accent), #a77dff); color:#0b0f1f;
     padding:3px 10px; border-radius:999px; font-weight:800; font-size:11px;
     text-transform:uppercase; letter-spacing:.6px;
   }
   .brand{opacity:.95; font-weight:900; letter-spacing:.2px; font-size: clamp(16px, 4vw, 22px);}
-  .top-actions{display:flex; gap:8px; align-items:center}
+  .top-actions{display:flex; gap:8px; align-items:center; justify-content:flex-end}
 
   .btn{
     appearance:none; border:0; cursor:pointer; user-select:none; padding:9px 12px; border-radius:12px;
@@ -57,10 +57,10 @@
   /* Players */
   .players header{ margin:0 0 6px 2px; color:var(--sub); font-size:12px; }
 
-  /* SAFARI-PROOF GRID */
+  /* Row grid (Safari-proof) */
   .row{
     display:grid;
-    grid-template-columns: 28px 54px 1fr auto auto; /* drag | avatar | name | star+score | edit */
+    grid-template-columns: 28px 54px 1fr auto auto; /* drag | avatar | name | stars+score | edit */
     align-items:center; gap:10px;
     padding:10px; border-radius:14px;
     border:1px solid rgba(255,255,255,.06);
@@ -70,11 +70,10 @@
     touch-action:manipulation;
   }
   .drag{ cursor:grab; text-align:center; font-size:18px; color:var(--sub); }
-
   .row.dealer{ border-color: rgba(78,225,160,.55); box-shadow: 0 0 0 2px rgba(78,225,160,.22) inset; }
 
   .avatar{
-    width:54px; height:54px; border-radius:50%; flex:0 0 auto; display:grid; place-items:center;
+    width:54px; height:54px; border-radius:50%; display:grid; place-items:center;
     background:#0f1428; border:1px solid rgba(255,255,255,.14); overflow:hidden; font-weight:800;
   }
   .row.dealer .avatar{ box-shadow: 0 0 0 3px #4ee1a0, 0 0 0 6px rgba(78,225,160,.25); }
@@ -86,18 +85,13 @@
   }
 
   .stars{ color:var(--danger); font-weight:900; font-size:18px; white-space:nowrap; margin-right:6px }
-
-  .scorewrap{
-    display:flex; align-items:center; gap:8px;
-    white-space:nowrap; /* keep ★ 10 + 99 tight */
-  }
+  .scorewrap{ display:flex; align-items:center; gap:8px; white-space:nowrap; }
   .score{ font-variant-numeric: tabular-nums; font-weight:900; text-align:right; font-size: clamp(22px, 5.2vw, 28px); }
   .score.over{ color:var(--danger) }
-
   .actions{ display:flex; gap:6px; align-items:center; }
   .actions .iconbtn{ width:40px; height:40px; font-size:16px; }
 
-  /* Dialogs, banners, cropper, etc. (unchanged below) */
+  /* Dialogs, banners, cropper, etc. (unchanged) */
   .banner{ margin:10px 0; padding:10px 12px; border-radius:14px; border:1px solid rgba(255,255,255,.1);
     background: linear-gradient(90deg, rgba(78,225,160,.15), rgba(122,162,255,.1)); color:#d7fff0; display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; }
   .banner .tag{ background:#0f1428; border:1px solid rgba(255,255,255,.08); padding:4px 8px; border-radius:999px; font-size:12px; color:#b8c0ff }
@@ -160,11 +154,11 @@
     <div class="top-left">
       <span class="chip">Conga / Chinchón</span>
       <span class="brand">Alanis Scorekeeper</span>
+      <button id="openSettings" class="iconbtn" aria-label="Settings" style="margin-left:auto">⚙️</button>
     </div>
     <div class="top-actions">
       <button id="historyBtn" class="btn ghost">History</button>
       <button id="newRoundBtn" class="btn primary" data-i18n="newRound">New round</button>
-      <button id="openSettings" class="iconbtn" aria-label="Settings">⚙️</button>
     </div>
   </header>
 
@@ -406,7 +400,7 @@
   };
 
   /* State */
-  const storageKey="conga_state_ui_rev5";
+  const storageKey="conga_state_ui_rev6";
   let players=[], limit=100, nextDealerId=null, autoAdvanceDealer=true, gameOver=false;
   let cutsHistory=[]; let roundCounter=0; let rounds=[];
 
@@ -570,6 +564,7 @@
     const snapshotInputs = JSON.parse(JSON.stringify(inputs));
     const roundNo = roundCounter + 1;
 
+    // Projected totals
     const proj=new Map(); players.forEach(p=>{ proj.set(p.id, clampInt(p.score||0)+clampInt(inputs[p.id]??0)); });
 
     roundCounter += 1;
@@ -578,48 +573,44 @@
       cutsHistory.push({ id: cid, name: cutter?.name||"—", round: roundCounter, timestamp: Date.now(), result: "played" });
     }
 
-    if(players.length===2){
-      const [a,b]=players; const A=proj.get(a.id), B=proj.get(b.id);
-      if(A>=limit+1 && B<=limit){
-        a.score=A; b.score=B; gameOver=true;
-        rounds.push({round:roundNo, inputs:snapshotInputs, totals:snapshotTotalsById(), cutterId:cid, timestamp:Date.now()});
-        showWinOverlay(b); save(); render(); return;
-      }
-      if(B>=limit+1 && A<=limit){
-        a.score=A; b.score=B; gameOver=true;
-        rounds.push({round:roundNo, inputs:snapshotInputs, totals:snapshotTotalsById(), cutterId:cid, timestamp:Date.now()});
-        showWinOverlay(a); save(); render(); return;
-      }
-    }
+    // Determine who stays ≤ limit
+    const under = players.filter(p => (proj.get(p.id) ?? p.score) <= limit);
+    const over  = players.filter(p => (proj.get(p.id) ?? p.score) >= (limit+1));
 
-    if(cid){
-      const cProj=proj.get(cid); const ok=cProj<=limit;
-      const others=players.filter(p=>p.id!==cid); const allOver=others.every(o=>(proj.get(o.id)??o.score)>limit);
-      if(ok && allOver){
-        players.forEach(p=>p.score=proj.get(p.id));
-        gameOver=true;
+    // Immediate win if exactly one player remains ≤100
+    if (under.length === 1){
+      players.forEach(p=>{ p.score = proj.get(p.id); });
+      gameOver = true;
+
+      // tag a cut-win if applicable
+      if (cid){
         const last = cutsHistory.slice().reverse().find(h => h.round===roundCounter && h.id===cid);
-        if (last) last.result="cut_win";
-        rounds.push({round:roundNo, inputs:snapshotInputs, totals:snapshotTotalsById(), cutterId:cid, timestamp:Date.now()});
-        showWinOverlay(players.find(p=>p.id===cid));
-        save(); render(); return;
+        if (last) last.result = (cid === under[0].id) ? "cut_win" : "normal";
       }
+
+      rounds.push({round:roundNo, inputs:snapshotInputs, totals:snapshotTotalsById(), cutterId:cid, timestamp:Date.now()});
+      showWinOverlay(under[0]); save(); render(); return;
     }
 
-    players.forEach(p=>{
-      let val=proj.get(p.id);
-      if(val>=limit+1){
-        const othersUnder=players.filter(o=>o.id!==p.id).map(o=>proj.get(o.id)).filter(v=>Number.isFinite(v)&&v<=limit);
-        const maxUnder=othersUnder.length?Math.max(...othersUnder):0;
-        proj.set(p.id, maxUnder);
-        p.reenganches=(p.reenganches||0)+1;
-      }
-    });
+    // Otherwise, reenganche only if there are at least two players ≤100
+    if (under.length >= 2 && over.length){
+      const maxUnderVal = Math.max(...under.map(p => proj.get(p.id)));
+      players.forEach(p=>{
+        let val = proj.get(p.id);
+        if (val >= (limit+1)){
+          proj.set(p.id, maxUnderVal);
+          p.reenganches = (p.reenganches||0) + 1;
+        }
+      });
+    }
 
+    // Apply totals
     players.forEach(p=>{ p.score=proj.get(p.id); });
 
+    // Advance dealer
     if(autoAdvanceDealer) advanceDealer();
 
+    // finalize cut history (non cut-win)
     if (cid){
       const last = cutsHistory.slice().reverse().find(h => h.round===roundCounter && h.id===cid);
       if (last && last.result==="played") last.result="normal";
