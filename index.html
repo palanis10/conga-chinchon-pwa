@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="viewport"
+  content="width=device-width, initial-scale=1, user-scalable=yes, maximum-scale=5" />
 <title>Conga / Chinchón – Alanis Scorekeeper</title>
 
 <meta name="theme-color" content="#0f1220" />
@@ -25,6 +26,10 @@
     color:var(--text); -webkit-font-smoothing:antialiased; line-height:1.35;
   }
   .app{max-width:980px; margin:0 auto; padding: calc(8px + env(safe-area-inset-top, 0px)) 12px 120px;}
+
+  /* iOS auto-zoom prevention (keep pinch available) */
+  input, select, textarea, button { font-size:16px; }
+  .round-row input[type="number"], .round-row .minus10 { font-size:16px; }
 
   /* Top bar → 2 rows (title row, then actions row) */
   header.topbar{
@@ -57,7 +62,6 @@
   /* Players */
   .players header{ margin:0 0 6px 2px; color:var(--sub); font-size:12px; }
 
-  /* Row grid (Safari-proof) */
   .row{
     display:grid;
     grid-template-columns: 28px 54px 1fr auto auto; /* drag | avatar | name | stars+score | edit */
@@ -91,11 +95,12 @@
   .actions{ display:flex; gap:6px; align-items:center; }
   .actions .iconbtn{ width:40px; height:40px; font-size:16px; }
 
-  /* Dialogs, banners, cropper, etc. (unchanged) */
+  /* Banner */
   .banner{ margin:10px 0; padding:10px 12px; border-radius:14px; border:1px solid rgba(255,255,255,.1);
     background: linear-gradient(90deg, rgba(78,225,160,.15), rgba(122,162,255,.1)); color:#d7fff0; display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; }
   .banner .tag{ background:#0f1428; border:1px solid rgba(255,255,255,.08); padding:4px 8px; border-radius:999px; font-size:12px; color:#b8c0ff }
 
+  /* Dialogs */
   dialog{ width:min(720px, 96vw); border-radius:16px; border:1px solid rgba(255,255,255,.12);
     background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01)) , #0f1428; color:var(--text);
     box-shadow: 0 24px 64px rgba(0,0,0,.55); }
@@ -108,10 +113,13 @@
   input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0;}
   .switch{display:flex; align-items:center; gap:10px; background:#0f1428; border:1px solid var(--muted); padding:8px 10px; border-radius:12px; height:38px;}
 
+  /* Round dialog – compact rows */
   .grid-rows{ display:grid; gap:6px }
-  .round-row{ display:grid; grid-template-columns: 1fr 100px 56px 36px; gap:8px; align-items:center;
+  .round-row{
+    display:grid; grid-template-columns: 1fr 100px 56px 36px; gap:8px; align-items:center;
     padding:6px; border:1px dashed rgba(255,255,255,.15); border-radius:12px;
-    background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.00)); }
+    background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.00));
+  }
   .round-row input[type="number"]{ height:34px; padding:6px 8px; }
   .round-row .minus10{ width:100%; height:34px; border-radius:10px; border:1px solid rgba(255,255,255,.12);
     background:linear-gradient(135deg, #1c243e, #121a34); color:var(--text); font-weight:800; padding:0 4px; }
@@ -121,6 +129,7 @@
   .error{ color:var(--danger); font-weight:700; margin-right:auto }
   .hint{ color:var(--sub); font-size:12px }
 
+  /* WIN OVERLAY */
   .win-overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(5,8,20,.55); z-index: 9999; padding: 16px; }
   .win-card { width: min(560px, 94vw); border-radius: 20px; padding: 14px; border: 1px solid rgba(255,255,255,.12); background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02)), #0f1428; box-shadow: 0 24px 64px rgba(0,0,0,.55); position: relative; overflow: hidden; }
   .win-head { display:flex; align-items:center; gap:12px; }
@@ -131,19 +140,24 @@
   #confettiCanvas { position:absolute; inset:0; pointer-events:none; }
   .win-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:10px; flex-wrap:wrap; }
 
+  /* CROP MODAL */
   #cropDialog canvas { width: 100%; height: auto; background:#0e1326; border-radius:12px; border:1px solid rgba(255,255,255,.12); touch-action: none; }
   .crop-controls { display:flex; gap:10px; align-items:center; justify-content:space-between; margin-top:10px; }
   .crop-frame-hint { color:#b8c0ff; font-size:12px; }
 
+  /* CUT HISTORY (player) */
   .history-list { display:grid; gap:8px; max-height:50vh; overflow:auto; }
   .history-item { padding:8px; border-radius:10px; border:1px solid rgba(255,255,255,.08); background:rgba(255,255,255,.02); }
 
+  /* Rounds history – compact table */
   .table-wrap{ overflow:auto; max-height:60vh; border:1px solid rgba(255,255,255,.12); border-radius:12px;}
-  table{ width:max(520px,100%); border-collapse:separate; border-spacing:0; }
+  table{ width:max(520px,100%); border-collapse:separate; border-spacing:0; table-layout:fixed; }
   thead th{ position:sticky; top:0; background:#121633; border-bottom:1px solid rgba(255,255,255,.12); padding:10px; text-align:center; font-weight:800;}
-  tbody td, tbody th{ padding:8px 10px; border-bottom:1px solid rgba(255,255,255,.06); text-align:center; font-variant-numeric:tabular-nums; }
+  tbody td, tbody th{ padding:6px 8px; border-bottom:1px solid rgba(255,255,255,.06); text-align:right; font-variant-numeric:tabular-nums; }
+  tbody th{ text-align:left; }
+  /* Skinny first column (#) */
+  thead th:first-child, tbody th:first-child{ width:44px; padding-left:10px; padding-right:6px; text-align:left; }
   tbody tr:nth-child(odd){ background:rgba(255,255,255,.02) }
-  tbody th{ text-align:left; white-space:nowrap; }
 </style>
 </head>
 <body>
@@ -399,8 +413,20 @@
     const st=document.getElementById("settingsTitle"); if(st) st.textContent=t("settings");
   };
 
+  /* Viewport reset helper (stop sticky zoom after dialogs) */
+  function resetViewportScaleIfZoomed(){
+    try{
+      if (window.visualViewport && visualViewport.scale > 1){
+        const vp = document.querySelector('meta[name="viewport"]');
+        const base = 'width=device-width, initial-scale=1';
+        vp.setAttribute('content', base + ', user-scalable=no, maximum-scale=1');
+        setTimeout(()=> vp.setAttribute('content', base + ', user-scalable=yes, maximum-scale=5'), 60);
+      }
+    }catch{}
+  }
+
   /* State */
-  const storageKey="conga_state_ui_rev6";
+  const storageKey="conga_state_ui_rev7";
   let players=[], limit=100, nextDealerId=null, autoAdvanceDealer=true, gameOver=false;
   let cutsHistory=[]; let roundCounter=0; let rounds=[];
 
@@ -521,7 +547,7 @@
     document.getElementById("removePhotoBtn").onclick = ()=>{ p.avatar=null; render(); };
     document.getElementById("viewHistoryBtn").onclick = ()=> openHistory(p.id);
     document.getElementById("deletePlayerBtn").onclick = ()=>{
-      if(confirm(t("confirmDelete"))){ editDlg.close(); removePlayer(p.id); }
+      if(confirm(t("confirmDelete"))){ editDlg.close(); removePlayer(p.id); setTimeout(resetViewportScaleIfZoomed,80); }
     };
     editDlg.showModal();
   }
@@ -532,7 +558,7 @@
     p.score = clampInt($("#editScore").value, p.score);
     p.reenganches = Math.max(0, clampInt($("#editReeng").value, p.reenganches));
     if (setDealerSwitch().checked) nextDealerId = p.id;
-    editDlg.close(); render();
+    editDlg.close(); render(); setTimeout(resetViewportScaleIfZoomed,80);
   });
 
   /* Round dialog + logic */
@@ -582,7 +608,6 @@
       players.forEach(p=>{ p.score = proj.get(p.id); });
       gameOver = true;
 
-      // tag a cut-win if applicable
       if (cid){
         const last = cutsHistory.slice().reverse().find(h => h.round===roundCounter && h.id===cid);
         if (last) last.result = (cid === under[0].id) ? "cut_win" : "normal";
@@ -607,10 +632,8 @@
     // Apply totals
     players.forEach(p=>{ p.score=proj.get(p.id); });
 
-    // Advance dealer
     if(autoAdvanceDealer) advanceDealer();
 
-    // finalize cut history (non cut-win)
     if (cid){
       const last = cutsHistory.slice().reverse().find(h => h.round===roundCounter && h.id===cid);
       if (last && last.result==="played") last.result="normal";
@@ -685,89 +708,4 @@
   cropCanvas.addEventListener('mousedown', e=>{ isPanning=true; lastX=e.offsetX; lastY=e.offsetY; });
   window.addEventListener('mouseup', ()=>{ isPanning=false; });
   cropCanvas.addEventListener('mousemove', e=>{ if(!isPanning) return; cx+=(e.offsetX-lastX); cy+=(e.offsetY-lastY); lastX=e.offsetX; lastY=e.offsetY; drawCrop(); });
-  cropCanvas.addEventListener('touchstart', e=>{ if(e.touches.length===2){ pinchStartDist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY); startScale=scale; } else { isPanning=true; lastX=e.touches[0].clientX; lastY=e.touches[0].clientY; }},{passive:false});
-  cropCanvas.addEventListener('touchmove', e=>{ e.preventDefault(); if(e.touches.length===2 && pinchStartDist){ const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY); scale=Math.min(3,Math.max(0.6, startScale*(d/pinchStartDist))); cropZoom.value=String(scale); drawCrop(); } else if(isPanning){ const x=e.touches[0].clientX,y=e.touches[0].clientY; cx+=(x-lastX); cy+=(y-lastY); lastX=x; lastY=y; drawCrop(); }},{passive:false});
-  cropCanvas.addEventListener('touchend', ()=>{ isPanning=false; pinchStartDist=null; }, {passive:true});
-  cropZoom.addEventListener('input', ()=>{ scale=+cropZoom.value; drawCrop(); });
-  cropResetBtn.addEventListener('click', ()=>{ scale=1; cx=0; cy=0; cropZoom.value='1'; drawCrop(); });
-  cropSaveBtn.addEventListener('click', ()=>{ const W=cropCanvas.width,H=cropCanvas.height; const out=document.createElement('canvas'); const octx=out.getContext('2d'); const R=Math.min(W,H)*0.42; out.width=out.height=R*2; octx.save(); octx.translate(R+cx, R+cy); octx.scale(scale, scale); const ratio=Math.min(W/cropImg.width, H/cropImg.height); const w=cropImg.width*ratio, h=cropImg.height*ratio; octx.beginPath(); octx.arc(0,0,R,0,Math.PI*2); octx.clip(); octx.drawImage(cropImg,-w/2,-h/2,w,h); octx.restore(); const dataURL=out.toDataURL('image/png',0.92); const p=players.find(x=>x.id===cropTargetId); if(p){ p.avatar=dataURL; render(); } cropDialog.close(); });
-
-  /* Cut history */
-  function openHistory(id){
-    const list=$("#historyList"); list.innerHTML="";
-    const my=(cutsHistory||[]).filter(h=>h.id===id).sort((a,b)=>a.round-b.round);
-    if(my.length===0){ list.innerHTML='<div class="history-item">No cuts recorded.</div>'; }
-    else{
-      for(const h of my){
-        const d=new Date(h.timestamp);
-        const label=h.result==='cut_win'?'✂️🏆 Cut win':(h.result==='normal'?'✂️ Cut (no win)':'✂️ Cut');
-        const row=document.createElement('div'); row.className='history-item'; row.textContent=`R${h.round} • ${label} • ${d.toLocaleString()}`;
-        list.appendChild(row);
-      }
-    }
-    historyDialog.showModal();
-  }
-
-  /* Rounds table */
-  function openRoundsTable(){
-    const wrap=$("#roundsTableWrap"); wrap.innerHTML="";
-    if(!rounds.length){ wrap.innerHTML='<div class="history-item">No rounds yet.</div>'; roundsDialog.showModal(); return; }
-    const table=document.createElement('table');
-    const thead=document.createElement('thead'); const trh=document.createElement('tr');
-    const th0=document.createElement('th'); th0.textContent="#"; trh.appendChild(th0);
-    players.forEach(p=>{ const th=document.createElement('th'); th.textContent=p.name; trh.appendChild(th); });
-    thead.appendChild(trh); table.appendChild(thead);
-
-    const tbody=document.createElement('tbody');
-    rounds.forEach(r=>{
-      const tr=document.createElement('tr');
-      const th=document.createElement('th'); th.textContent=String(r.round); tr.appendChild(th);
-      const showTotals = r.totals && typeof r.totals === 'object';
-      players.forEach(p=>{
-        const td=document.createElement('td'); const v=showTotals?r.totals[p.id]:r.inputs[p.id]; td.textContent=Number.isFinite(v)?v:""; tr.appendChild(td);
-      });
-      tbody.appendChild(tr);
-    });
-    table.appendChild(tbody);
-    wrap.appendChild(table);
-    roundsDialog.showModal();
-  }
-
-  /* Wire-up UI */
-  const settingsDialog=document.getElementById("settingsDialog");
-  document.getElementById("openSettings").onclick=()=>settingsDialog.showModal();
-  document.getElementById("historyBtn").onclick=openRoundsTable;
-
-  document.getElementById("addPlayerBtn").onclick=()=>{ const name=prompt(lang==="es"?"Nombre del jugador:":"Player name?"); if(name!==null) addPlayer(String(name).trim()||undefined); };
-  document.getElementById("newRoundBtn").onclick=()=>openRound();
-  document.getElementById("exportBtn").onclick=exportCSV;
-
-  $("#limitInput").oninput=e=>{ const v=clampInt(e.target.value,limit); limit=Math.max(1,v); render(); };
-  $("#autoAdvance").onchange=e=>{ autoAdvanceDealer=!!e.target.checked; render(); };
-
-  $("#resetScoresBtn").onclick=()=>{ if(players.length&&confirm(lang==="es"?"¿Reiniciar todos los puntajes y reenganches?":"Reset all scores and reenganches?")){ players.forEach(p=>{p.score=0;p.reenganches=0;}); gameOver=false; render(); } };
-  $("#clearAllBtn").onclick=()=>{ if(confirm(lang==="es"?"¿Limpiar todos los jugadores y ajustes?":"Clear all players and settings?")){ players=[]; limit=100; nextDealerId=null; autoAdvanceDealer=true; gameOver=false; cutsHistory=[]; rounds=[]; roundCounter=0; render(); } };
-
-  $("#newGameBtn").onclick=()=>{ players.forEach(p=>{p.score=0;p.reenganches=0;}); gameOver=false; render(); window.scrollTo({top:0,behavior:"smooth"}); };
-  document.getElementById("roundForm").onsubmit=e=>{ e.preventDefault(); if(!validateRound()) return; const inputs=roundInputs(); const cid=selectedCutter(); if(cid){ const p=players.find(x=>x.id===cid); const projected=clampInt(p.score||0)+clampInt(inputs[p.id]??0); if(projected>limit){ $("#roundError").textContent=(I18N[lang].cutterExceeds||I18N.en.cutterExceeds)(limit,projected); $("#roundError").style.display=""; return; } } roundDlg.close(); applyRound(inputs,cid); };
-  $("#langToggle").onclick=()=>{ lang=(lang==="es"?"en":"es"); save(); render(); };
-
-  /* Init */
-  load();
-  if(players.length===0){
-    const isEs = detectLang()==="es";
-    addPlayer(isEs?"Jugador 1":"Player 1");
-    addPlayer(isEs?"Jugador 2":"Player 2");
-  }
-  render();
-
-  /* SW */
-  if('serviceWorker' in navigator){
-    window.addEventListener('load', ()=>{
-      navigator.serviceWorker.register('service-worker.js').catch(()=>{ /* ignore */ });
-    });
-  }
-})();
-</script>
-</body>
-</html>
+  cropCanvas.addEventListener('touchstart', e=>{ if(e.touches.length===2){ pinchStartDist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY); startScale=scale; } else { isPanning=true; lastX=e.touches
