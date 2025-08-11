@@ -1,1 +1,467 @@
+<script>
+(() => {
+  "use strict";
+
+  /* State */
+  const storageKey="conga_state_ui_rev12";
+  let players=[], limit=100, nextDealerId=null, autoAdvanceDealer=true, gameOver=false;
+  let cutsHistory=[]; let roundCounter=0; let rounds=[];
+  let winsLog=[]; // {playerId, name, date, timestamp}
+  let lockOrder=false;
+
+  /* Utils */
+  const $=s=>document.querySelector(s);
+  const uid=()=> "p"+Math.random().toString(36).slice(2)+Date.now().toString(36);
+  const clampInt=(v,d=0)=>Number.isFinite(+v)?Math.trunc(+v):d;
+  const initials=(n)=> (n||" ").trim().split(/\s+/).map(s=>s[0]).join("").slice(0,2).toUpperCase();
+  const csv=s=>(/[",\n]/.test(s)?'"'+String(s).replace(/"/g,'""')+'"':String(s));
+  const todayStr=()=> new Date().toISOString().slice(0,10);
+  const pruneWins=()=>{ const cutoff=Date.now()-7*24*3600*1000; winsLog = (winsLog||[]).filter(w=>w.timestamp>=cutoff); };
+  function toast(msg){ const t=document.createElement('div'); t.className='toast'; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>{ t.remove(); },1400); }
+
+  function resetViewportScaleIfZoomed(){
+    try{
+      if (window.visualViewport && window.visualViewport.scale > 1){
+        const vp = document.querySelector('meta[name="viewport"]');
+        const base = 'width=device-width, initial-scale=1';
+        vp.setAttribute('content', base + ', user-scalable=no, maximum-scale=1');
+        setTimeout(()=> vp.setAttribute('content', base + ', user-scalable=yes, maximum-scale=5'), 60);
+      }
+    }catch{}
+  }
+
+  /* Save / Load */
+  const save=()=>{localStorage.setItem(storageKey, JSON.stringify({players,limit,nextDealerId,autoAdvanceDealer,gameOver,cutsHistory,roundCounter,rounds,winsLog,lockOrder}));};
+  const load=()=>{try{
+      const s=JSON.parse(localStorage.getItem(storageKey)||"{}");
+      players = Array.isArray(s.players) ? s.players : [];
+      limit   = Number.isFinite(s.limit) ? s.limit : 100;
+      autoAdvanceDealer = (typeof s.autoAdvanceDealer === "boolean") ? s.autoAdvanceDealer : true;
+      nextDealerId = (typeof s.nextDealerId==="string") ? s.nextDealerId : (players[0] ? players[0].id : null);
+      gameOver = !!s.gameOver;
+      cutsHistory = Array.isArray(s.cutsHistory)? s.cutsHistory : [];
+      roundCounter = Number.isFinite(s.roundCounter)? s.roundCounter : 0;
+      rounds = Array.isArray(s.rounds)? s.rounds : [];
+      winsLog = Array.isArray(s.winsLog)? s.winsLog : [];
+      lockOrder = !!s.lockOrder;
+      pruneWins();
+    }catch(e){ players=[]; }
+  };
+
+  /* Render */
+  const list=$("#playersList"), rowTpl=document.getElementById("playerRowTpl");
+  function render(){
+    const limitInput=$("#limitInput"); if(limitInput) limitInput.value=limit;
+    const autoAdv=$("#autoAdvance"); if(autoAdv) autoAdv.checked=autoAdvanceDealer;
+    const lockSw=$("#lockOrderSwitch"); if(lockSw) lockSw.checked=lockOrder;
+
+    const nd=$("#nextDealerName");
+    if(nd){ 
+      const ndp=players.find(p=>p.id===nextDealerId);
+      nd.textContent = ndp ? (ndp.name||"—") : "—";
+    }
+
+    const banner=$("#banner"); if(banner) banner.style.display=gameOver?"":"none";
+    const lockBtn=$("#lockToggle"); 
+    if(lockBtn){ lockBtn.textContent = lockOrder ? "🔒" : "🔓"; lockBtn.title = lockOrder ? "Unlock player order" : "Lock player order"; lockBtn.setAttribute("aria-label", lockBtn.title); }
+
+    list.innerHTML="";
+    players.forEach((p,i)=>{
+      const n=rowTpl.content.firstElementChild.cloneNode(true);
+      n.dataset.index=i; n.dataset.id=p.id;
+      n.draggable = !lockOrder;
+
+      if(!lockOrder){
+        n.addEventListener("dragstart",dragStart);
+        n.addEventListener("dragover",dragOver);
+        n.addEventListener("drop",drop);
+        n.addEventListener("dragend",dragEnd);
+      }
+      attachLongPress(n, ()=>openEdit(p.id));
+
+      if(p.id===nextDealerId) n.classList.add("dealer"); else n.classList.remove("dealer");
+
+      const avatarBox=n.querySelector(".avatar");
+      if(avatarBox){
+        if(p.avatar){ avatarBox.innerHTML = '<img alt="" src="'+p.avatar+'">'; }
+        else { avatarBox.innerHTML = '<span class="initials">'+initials(p.name||"")+'</span>'; }
+      }
+
+      const nameEl=n.querySelector(".playerName"); if(nameEl) nameEl.textContent=p.name||"—";
+      const sEl=n.querySelector(".stars"); if(sEl){ const r=clampInt(p.reenganches||0,0); sEl.textContent = r>0 ? (r===1 ? "★" : "★ "+r) : ""; }
+      const sv=n.querySelector(".scoreVal"); if(sv) sv.textContent=clampInt(p.score||0);
+      const scWrap=n.querySelector(".score"); if(scWrap){ if((p.score||0)>=limit+1) scWrap.classList.add("over"); else scWrap.classList.remove("over"); }
+
+      const handle=n.querySelector(".drag");
+      if(handle){ if(lockOrder){ handle.classList.add("locked"); handle.onclick=()=>toast("Order locked"); } else { handle.classList.remove("locked"); handle.onclick=null; } }
+
+      list.appendChild(n);
+    });
+    const nr=$("#newRoundBtn"); if(nr) nr.disabled=players.length===0||gameOver;
+    save();
+  }
+
+  /* Long-press */
+  function attachLongPress(el, cb){
+    let tmr, moved=false;
+    const start = ()=>{ moved=false; tmr=setTimeout(()=>{ if(!moved) cb(); },600); };
+    const end = ()=>{ clearTimeout(tmr); };
+    el.addEventListener('touchstart', start, {passive:true});
+    el.addEventListener('mousedown', start);
+    el.addEventListener('touchmove', ()=>{ moved=true; }, {passive:true});
+    ['touchend','touchcancel','mouseup','mouseleave'].forEach(ev=>el.addEventListener(ev, end));
+  }
+
+  /* Drag & drop */
+  let dragIdx=null;
+  const dragStart=e=>{dragIdx=+e.currentTarget.dataset.index; e.dataTransfer.effectAllowed="move"; e.dataTransfer.setData("text/plain", String(dragIdx)); e.currentTarget.setAttribute("aria-grabbed","true");};
+  const dragOver=e=>{e.preventDefault(); e.dataTransfer.dropEffect="move";};
+  const drop=e=>{e.preventDefault(); const from=dragIdx!=null?dragIdx:+e.dataTransfer.getData("text/plain"); const to=+e.currentTarget.dataset.index; if(Number.isInteger(from)&&Number.isInteger(to)&&from!==to){ const arr=players.slice(); const m=arr.splice(from,1)[0]; arr.splice(to,0,m); const keep=nextDealerId; players=arr; nextDealerId=keep; render(); }};
+  const dragEnd=e=>{e.currentTarget.setAttribute("aria-grabbed","false"); dragIdx=null;};
+
+  /* Dealer */
+  const advanceDealer=()=>{ if(!players.length||!nextDealerId) return; const i=players.findIndex(p=>p.id===nextDealerId); nextDealerId=players[(i>=0&&i<players.length-1)?i+1:0].id; };
+
+  /* CRUD */
+  const addPlayer=(name="")=>{ const p={id:uid(), name:name||("Player "+(players.length+1)), score:0, reenganches:0, avatar:null}; players.push(p); if(!nextDealerId && players[0]) nextDealerId=players[0].id; gameOver=false; render(); };
+  const removePlayer=id=>{ const i=players.findIndex(p=>p.id===id); if(i<0) return; const was=players[i].id===nextDealerId; players.splice(i,1); if(!players.length) nextDealerId=null; else if(was) nextDealerId=players[Math.min(i,players.length-1)].id; render(); };
+
+  /* Photo + cropper */
+  const photoInput=document.getElementById("photoInput"); let photoTarget=null;
+  if(photoInput) photoInput.removeAttribute('capture');
+  if(photoInput) photoInput.addEventListener("change", async()=>{
+    if(!photoTarget || !photoInput.files || !photoInput.files[0]) return;
+    const file=photoInput.files[0];
+    const dataUrl=await new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=rej; r.readAsDataURL(file); });
+    openCropper(dataUrl, photoTarget);
+    photoTarget=null;
+  });
+
+  /* Edit dialog */
+  const editDlg=document.getElementById("editDialog"), editForm=document.getElementById("editForm");
+  const setDealerSwitch = ()=>document.getElementById("setDealerSwitch");
+  function openEdit(id){
+    const p=players.find(x=>x.id===id); if(!p) return;
+    $("#editId").value=p.id;
+    $("#editName").value=p.name||"";
+    $("#editScore").value=clampInt(p.score||0);
+    $("#editReeng").value=clampInt(p.reenganches||0);
+    const sds=setDealerSwitch(); if(sds) sds.checked = (p.id === nextDealerId);
+
+    $("#changePhotoBtn").onclick = ()=>{ photoTarget=p.id; photoInput.value=""; photoInput.click(); };
+    $("#removePhotoBtn").onclick = ()=>{ p.avatar=null; render(); };
+    $("#viewHistoryBtn").onclick = ()=> openHistory(p.id);
+    $("#deletePlayerBtn").onclick = ()=>{ if(confirm("Delete this player? This cannot be undone.")){ editDlg.close(); removePlayer(p.id); setTimeout(resetViewportScaleIfZoomed,80);} };
+    editDlg.showModal();
+  }
+  if(editForm) editForm.addEventListener("submit", (e)=>{
+    e.preventDefault();
+    const id=$("#editId").value; const p=players.find(x=>x.id===id); if(!p) return editDlg.close();
+    p.name = String($("#editName").value||"").trim() || p.name;
+    p.score = clampInt($("#editScore").value, p.score);
+    p.reenganches = Math.max(0, clampInt($("#editReeng").value, p.reenganches));
+    const sds=setDealerSwitch(); if(sds && sds.checked) nextDealerId = p.id;
+    editDlg.close(); render(); setTimeout(resetViewportScaleIfZoomed,80);
+  });
+
+  /* Round dialog + logic (unchanged except no optional chaining) */
+  const roundDlg=document.getElementById("roundDialog"), rows=document.getElementById("roundRows"), cutters=document.getElementById("cuttersGroup"), rErr=document.getElementById("roundError"), applyBtn=document.getElementById("applyRoundBtn");
+  const openRound=()=>{ rows.innerHTML=""; cutters.innerHTML="";
+    players.forEach(p=>{ const r=document.createElement("div"); r.className="round-row";
+      const name=document.createElement("div"); name.innerHTML="<strong>"+p.name+"</strong><div class='hint'>Current: "+(p.score||0)+"</div>";
+      const inp=document.createElement("input"); inp.id="rr_"+p.id; inp.type="number"; inp.step="1"; inp.inputMode="numeric"; inp.placeholder="0"; inp.dataset.pid=p.id; inp.addEventListener("input", validateRound);
+      const minus=document.createElement("button"); minus.type="button"; minus.className="minus10"; minus.textContent="−10"; minus.onclick=()=>{ inp.value=clampInt((inp.value===""?0:+inp.value)-10); validateRound(); };
+      const cut=document.createElement("div"); cut.className="r-cutter"; cut.innerHTML="<input type='radio' name='cutter' value='"+p.id+"' aria-label='Cutter "+p.name+"'>";
+      cut.querySelector("input").addEventListener("change", validateRound);
+      r.append(name,inp,minus,cut); rows.appendChild(r);
+
+      const chip=document.createElement("label"); chip.style.cssText="display:inline-flex;align-items:center;gap:8px;border:1px dashed rgba(255,255,255,.2);padding:6px 10px;border-radius:999px;cursor:pointer;"; chip.innerHTML="<input class='visually-hidden' type='radio' name='cutter' value='"+p.id+"'><span>✂️ "+p.name+"</span>"; chip.querySelector("input").addEventListener("change", validateRound); cutters.appendChild(chip);
+    });
+    const none=document.createElement("label"); none.style.cssText="display:inline-flex;align-items:center;gap:8px;border:1px dashed rgba(255,255,255,.2);padding:6px 10px;border-radius:999px;cursor:pointer;"; none.innerHTML="<input class='visually-hidden' type='radio' name='cutter' value='' checked><span>—</span>"; none.querySelector("input").addEventListener("change", validateRound); cutters.insertBefore(none, cutters.firstChild);
+    rErr.style.display="none"; applyBtn.disabled=false; roundDlg.showModal(); };
+  const roundInputs=()=>{ const m={}; players.forEach(p=>{ const el=document.getElementById("rr_"+p.id); m[p.id]=clampInt(el && el.value !== "" ? el.value : 0,0); }); return m; };
+  const selectedCutter=()=>{ const sel=document.querySelector('input[name="cutter"]:checked'); const v=sel?sel.value:""; return v||null; };
+  function validateRound(){ const inputs=roundInputs(); const cid=selectedCutter(); if(!cid){ rErr.style.display="none"; applyBtn.disabled=false; return true; } const c=players.find(p=>p.id===cid); if(!c){ rErr.textContent="Invalid cutter selected."; rErr.style.display=""; applyBtn.disabled=true; return false; } const proj=clampInt(c.score||0)+clampInt(inputs[c.id]||0); if(proj>limit){ rErr.textContent="Cutter cannot exceed "+limit+". (Projected: "+proj+")"; rErr.style.display=""; applyBtn.disabled=true; return false; } rErr.style.display="none"; applyBtn.disabled=false; return true; }
+
+  function snapshotTotalsById() { const o = {}; players.forEach(p => { o[p.id] = clampInt(p.score||0); }); return o; }
+
+  function applyRound(inputs,cid){
+    const snapshotInputs = JSON.parse(JSON.stringify(inputs));
+    const roundNo = roundCounter + 1;
+
+    const proj=new Map(); players.forEach(p=>{ proj.set(p.id, clampInt(p.score||0)+clampInt(inputs[p.id]||0)); });
+
+    roundCounter += 1;
+    if (cid){
+      const cutter = players.find(p=>p.id===cid);
+      cutsHistory.push({ id: cid, name: cutter? (cutter.name||"—") : "—", round: roundCounter, timestamp: Date.now(), result: "played" });
+    }
+
+    const under = players.filter(p => (proj.get(p.id) <= limit));
+    const over  = players.filter(p => (proj.get(p.id) >= (limit+1)));
+
+    if (under.length === 1){
+      players.forEach(p=>{ p.score = proj.get(p.id); });
+      gameOver = true;
+      const winner = under[0];
+      winsLog.push({ playerId:winner.id, name:winner.name, date:todayStr(), timestamp:Date.now() });
+      pruneWins();
+      if (cid){
+        const last = cutsHistory.slice().reverse().find(h => h.round===roundCounter && h.id===cid);
+        if (last) last.result = (cid === winner.id) ? "cut_win" : "normal";
+      }
+      rounds.push({round:roundNo, inputs:snapshotInputs, totals:snapshotTotalsById(), cutterId:cid, timestamp:Date.now()});
+      roundDlg.close(); showWinOverlay(winner); save(); render(); return;
+    }
+
+    if (under.length >= 2 && over.length){
+      const maxUnderVal = Math.max.apply(null, under.map(p => proj.get(p.id)));
+      players.forEach(p=>{
+        let val = proj.get(p.id);
+        if (val >= (limit+1)){
+          proj.set(p.id, maxUnderVal);
+          p.reenganches = (p.reenganches||0) + 1;
+        }
+      });
+    }
+
+    players.forEach(p=>{ p.score=proj.get(p.id); });
+    if(autoAdvanceDealer) advanceDealer();
+    if (cid){
+      const last = cutsHistory.slice().reverse().find(h => h.round===roundCounter && h.id===cid);
+      if (last && last.result==="played") last.result="normal";
+    }
+    rounds.push({round:roundNo, inputs:snapshotInputs, totals:snapshotTotalsById(), cutterId:cid, timestamp:Date.now()});
+    gameOver=false; render();
+  }
+
+  /* CSV */
+  const exportCSV=()=>{ const header=["name","score","reenganches","isDealer"]; const rows=players.map(p=>[csv(p.name||""), String(clampInt(p.score||0)), String(clampInt(p.reenganches||0)), String(p.id===nextDealerId)]); const all=[header].concat(rows).map(r=>r.join(",")).join("\n"); const blob=new Blob(["\ufeff",all],{type:"text/csv;charset=utf-8"}); const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="conga_scores.csv"; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();},0); };
+
+  /* Cut history */
+  function openHistory(id){
+    const list=$("#historyList"); list.innerHTML="";
+    const my=(cutsHistory||[]).filter(h=>h.id===id).sort(function(a,b){return a.round-b.round;});
+    if(my.length===0){ list.innerHTML='<div class="history-item">No cuts recorded.</div>'; }
+    else{
+      for(var i=0;i<my.length;i++){
+        const h=my[i]; const d=new Date(h.timestamp);
+        const label=h.result==='cut_win'?'✂️🏆 Cut win':(h.result==='normal'?'✂️ Cut (no win)':'✂️ Cut');
+        const row=document.createElement('div'); row.className='history-item'; row.textContent='R'+h.round+' • '+label+' • '+d.toLocaleString();
+        list.appendChild(row);
+      }
+    }
+    historyDialog.showModal();
+  }
+
+  /* Rounds table (per-game only) */
+  function openRoundsTable(){
+    const wrap=$("#roundsTableWrap"); wrap.innerHTML="";
+    if(!rounds.length){ wrap.innerHTML='<div class="history-item">No rounds yet.</div>'; roundsDialog.showModal(); return; }
+    const table=document.createElement('table');
+    const colWidth = 110;
+    const totalW = 32 + Math.max(4, players.length) * colWidth;
+    table.style.width = Math.max(520, totalW) + "px";
+
+    const thead=document.createElement('thead'); const trh=document.createElement('tr');
+    const th0=document.createElement('th'); th0.textContent="#"; trh.appendChild(th0);
+    players.forEach(function(p){ const th=document.createElement('th'); th.textContent=p.name; trh.appendChild(th); });
+    thead.appendChild(trh); table.appendChild(thead);
+
+    const tbody=document.createElement('tbody');
+    rounds.forEach(function(r){
+      const tr=document.createElement('tr');
+      const th=document.createElement('th'); th.textContent=String(r.round); tr.appendChild(th);
+      const showTotals = r.totals && typeof r.totals === 'object';
+      players.forEach(function(p){
+        const td=document.createElement('td'); const v=showTotals?r.totals[p.id]:r.inputs[p.id]; td.textContent=Number.isFinite(v)?v:""; tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    wrap.appendChild(table);
+    roundsDialog.showModal();
+  }
+
+  /* Wins (7d) */
+  function openWins(){
+    pruneWins();
+    const wrap=$("#winsWrap"); wrap.innerHTML="";
+    if(!winsLog.length){ wrap.innerHTML='<div class="history-item">No wins logged in the last 7 days.</div>'; winsDialog.showModal(); return; }
+    const map=new Map();
+    for(var i=0;i<winsLog.length;i++){
+      const w=winsLog[i];
+      if(!map.has(w.date)) map.set(w.date, new Map());
+      const m=map.get(w.date);
+      m.set(w.name, (m.get(w.name)||0)+1);
+    }
+    const dates=[].concat(Array.from(map.keys())).sort(function(a,b){return a<b?1:-1;});
+    for(var d=0; d<dates.length; d++){
+      const date=dates[d]; const m=map.get(date);
+      const div=document.createElement('div'); div.className='history-item';
+      const pairs=Array.from(m.entries()).sort(function(a,b){return b[1]-a[1];});
+      const list=pairs.map(function(x){return x[0]+": "+x[1];}).join(' • ');
+      div.textContent=date+" — "+list; wrap.appendChild(div);
+    }
+    winsDialog.showModal();
+  }
+
+  /* Win overlay + confetti (unchanged) */
+  const winOverlay=document.getElementById('winOverlay');
+  const winNameEl=document.getElementById('winName');
+  const winPhotoEl=document.getElementById('winPhoto');
+  const winCloseBtn=document.getElementById('winCloseBtn');
+  const winSound=document.getElementById('winSound');
+  const confettiCanvas=document.getElementById('confettiCanvas');
+  let confettiAnim, onResize;
+  function showWinOverlay(winner){
+    winNameEl.textContent = winner && winner.name ? winner.name : "Winner";
+    winPhotoEl.src = (winner && winner.avatar) ? winner.avatar : 'icons/icon-512.png';
+    winOverlay.style.display='flex';
+    startConfetti();
+    try{winSound.currentTime=0; winSound.play().catch(()=>{});}catch{}
+  }
+  function hideWinOverlay(){ winOverlay.style.display='none'; stopConfetti(); }
+  if(winCloseBtn) winCloseBtn.addEventListener('click', hideWinOverlay);
+  if(winOverlay) winOverlay.addEventListener('click', function(e){ if(e.target===winOverlay) hideWinOverlay(); });
+
+  function startConfetti(){
+    const ctx = confettiCanvas.getContext('2d');
+    const DPR = Math.max(1, window.devicePixelRatio||1);
+    const resize = function(){ confettiCanvas.width = confettiCanvas.clientWidth*DPR; confettiCanvas.height = confettiCanvas.clientHeight*DPR; };
+    resize(); onResize = resize; window.addEventListener('resize', onResize);
+    const W = function(){return confettiCanvas.width;}, H=function(){return confettiCanvas.height;};
+    const colors = ['#FFD166','#06D6A0','#118AB2','#EF476F','#A78BFA','#FF9F1C','#2EC4B6'];
+    const confetti = Array.from({length:220},()=>({ x: Math.random()*W(), y: -Math.random()*H(), r: 2+Math.random()*4, c: colors[(Math.random()*colors.length)|0], vx: -1 + Math.random()*2, vy: 1 + Math.random()*2.8, a: Math.random()*Math.PI*2, va: -0.2+Math.random()*0.4 }));
+    (function loop(){
+      const w=W(), h=H(); ctx.clearRect(0,0,w,h);
+      for(let i=0;i<confetti.length;i++){
+        const p=confetti[i]; p.x += p.vx; p.y += p.vy; p.a += p.va;
+        if(p.y > h+20){ p.y = -10; p.x = Math.random()*w; }
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.a);
+        ctx.fillStyle = p.c; ctx.fillRect(-p.r, -p.r, p.r*2, p.r*2);
+        ctx.restore();
+      }
+      confettiAnim = requestAnimationFrame(loop);
+    })();
+  }
+  function stopConfetti(){ cancelAnimationFrame(confettiAnim); window.removeEventListener('resize', onResize||function(){}); }
+
+  /* Cropper */
+  const cropDialog=document.getElementById('cropDialog');
+  const cropCanvas=document.getElementById('cropCanvas');
+  const cropCtx=cropCanvas?cropCanvas.getContext('2d'):null;
+  const cropZoom=document.getElementById('cropZoom');
+  const cropResetBtn=document.getElementById('cropReset');
+  const cropSaveBtn=document.getElementById('cropSave');
+  let cropImg=new Image(), cropTargetId=null, cx=0, cy=0, scale=1, isPanning=false, lastX=0, lastY=0, pinchStartDist=null, startScale=1;
+
+  function openCropper(dataUrl, targetId){
+    cropTargetId=targetId; cropImg=new Image();
+    cropImg.onload=function(){ scale=1; cx=0; cy=0; if(cropZoom) cropZoom.value='1'; drawCrop(); cropDialog.showModal(); };
+    cropImg.src=dataUrl;
+  }
+  function drawCrop(){
+    if(!cropCtx) return;
+    const W=cropCanvas.width,H=cropCanvas.height; cropCtx.clearRect(0,0,W,H);
+    cropCtx.save(); cropCtx.translate(W/2+cx, H/2+cy); cropCtx.scale(scale, scale);
+    const ratio=Math.min(W/cropImg.width, H/cropImg.height); const w=cropImg.width*ratio, h=cropImg.height*ratio;
+    cropCtx.drawImage(cropImg, -w/2, -h/2, w, h); cropCtx.restore();
+    cropCtx.save(); cropCtx.fillStyle="rgba(0,0,0,.35)"; cropCtx.beginPath(); cropCtx.rect(0,0,W,H); cropCtx.arc(W/2,H/2,Math.min(W,H)*0.42,0,Math.PI*2,true); cropCtx.fill("evenodd"); cropCtx.restore();
+    cropCtx.beginPath(); cropCtx.strokeStyle="rgba(255,255,255,.85)"; cropCtx.lineWidth=3; cropCtx.arc(W/2,H/2,Math.min(W,H)*0.42,0,Math.PI*2); cropCtx.stroke();
+  }
+  if(cropCanvas){
+    cropCanvas.addEventListener('mousedown', function(e){ isPanning=true; lastX=e.offsetX; lastY=e.offsetY; });
+    window.addEventListener('mouseup', function(){ isPanning=false; });
+    cropCanvas.addEventListener('mousemove', function(e){ if(!isPanning) return; cx+=(e.offsetX-lastX); cy+=(e.offsetY-lastY); lastX=e.offsetX; lastY=e.offsetY; drawCrop(); });
+    cropCanvas.addEventListener('touchstart', function(e){ if(e.touches.length===2){ pinchStartDist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY); startScale=scale; } else { isPanning=true; lastX=e.touches[0].clientX; lastY=e.touches[0].clientY; }},{passive:false});
+    cropCanvas.addEventListener('touchmove', function(e){ e.preventDefault(); if(e.touches.length===2 && pinchStartDist){ const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY); scale=Math.min(3,Math.max(0.6, startScale*(d/pinchStartDist))); if(cropZoom) cropZoom.value=String(scale); drawCrop(); } else if(isPanning){ const x=e.touches[0].clientX,y=e.touches[0].clientY; cx+=(x-lastX); cy+=(y-lastY); lastX=x; lastY=y; drawCrop(); }},{passive:false});
+    cropCanvas.addEventListener('touchend', function(){ isPanning=false; pinchStartDist=null; }, {passive:true});
+  }
+  if(cropZoom) cropZoom.addEventListener('input', function(){ scale=+cropZoom.value; drawCrop(); });
+  if(cropResetBtn) cropResetBtn.addEventListener('click', function(){ scale=1; cx=0; cy=0; cropZoom.value='1'; drawCrop(); });
+  if(cropSaveBtn) cropSaveBtn.addEventListener('click', function(){
+    const W=cropCanvas.width,H=cropCanvas.height; const out=document.createElement('canvas'); out.width=out.height=320; const octx=out.getContext('2d');
+    octx.fillStyle='#0f1428'; octx.fillRect(0,0,out.width,out.height);
+    octx.save(); octx.beginPath(); octx.arc(out.width/2, out.height/2, out.width/2 - 2, 0, Math.PI*2); octx.clip();
+    const ratio=Math.min(W/cropImg.width, H/cropImg.height); const iw=cropImg.width*ratio, ih=cropImg.height*ratio;
+    octx.translate(out.width/2 + (cx*(out.width/W)), out.height/2 + (cy*(out.height/H)));
+    octx.scale(scale*(out.width/W), scale*(out.height/H));
+    octx.drawImage(cropImg,-iw/2,-ih/2,iw,ih); octx.restore();
+    const dataURL=out.toDataURL('image/jpeg',0.85);
+    const p=players.find(function(x){return x.id===cropTargetId;}); if(p){ p.avatar=dataURL; render(); } cropDialog.close();
+  });
+
+  /* Backup / Restore */
+  function doBackup(){
+    const payload = { v: 1, savedAt: new Date().toISOString(), players, limit, nextDealerId, autoAdvanceDealer, rounds, winsLog, cutsHistory, roundCounter, lockOrder };
+    const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"}); const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="conga_backup.json"; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();},0);
+  }
+  async function doRestore(file){
+    try{
+      const text = await file.text(); const data = JSON.parse(text);
+      if(!data || !Array.isArray(data.players)) throw new Error("Invalid file");
+      players = data.players; limit = Number.isFinite(data.limit)? data.limit : limit;
+      nextDealerId = typeof data.nextDealerId==="string" ? data.nextDealerId : nextDealerId;
+      autoAdvanceDealer = typeof data.autoAdvanceDealer==="boolean" ? data.autoAdvanceDealer : autoAdvanceDealer;
+      rounds = Array.isArray(data.rounds) ? data.rounds : [];
+      winsLog = Array.isArray(data.winsLog) ? data.winsLog : [];
+      cutsHistory = Array.isArray(data.cutsHistory) ? data.cutsHistory : [];
+      roundCounter = Number.isFinite(data.roundCounter) ? data.roundCounter : 0;
+      lockOrder = !!data.lockOrder;
+      pruneWins(); render(); toast("Backup restored");
+    }catch(e){ toast("Restore failed"); console.error(e); }
+  }
+
+  /* Wire-up */
+  const settingsDialog=document.getElementById("settingsDialog");
+  const importInput=$("#importJsonInput");
+
+  $("#openSettings").onclick=()=>settingsDialog.showModal();
+  $("#historyBtn").onclick=openRoundsTable;
+  $("#winsBtn").onclick=openWins;
+  $("#backupBtn").onclick=doBackup;
+  $("#restoreBtn").onclick=()=>{ if(importInput){ importInput.value=""; importInput.click(); }};
+  if(importInput) importInput.addEventListener("change", ()=>{ const f=(importInput.files && importInput.files[0]) ? importInput.files[0] : null; if(f) doRestore(f); });
+
+  $("#lockToggle").onclick=()=>{ lockOrder=!lockOrder; render(); };
+
+  $("#limitInput").oninput=e=>{ const v=clampInt(e.target.value,limit); limit=Math.max(1,v); render(); };
+  $("#autoAdvance").onchange=e=>{ autoAdvanceDealer=!!e.target.checked; render(); };
+  $("#lockOrderSwitch").onchange=e=>{ lockOrder=!!e.target.checked; render(); };
+
+  $("#addPlayerBtn").onclick=()=>{ const name=prompt("Player name?"); if(name!==null) addPlayer(String(name).trim()||undefined); };
+  $("#newRoundBtn").onclick=()=>openRound();
+  $("#exportBtn").onclick=exportCSV;
+
+  $("#resetScoresBtn").onclick=()=>{ if(players.length&&confirm("Reset all scores and reenganches?")){ players.forEach(p=>{p.score=0;p.reenganches=0;}); gameOver=false; render(); } };
+  $("#clearAllBtn").onclick=()=>{ if(confirm("Clear all players and settings?")){ players=[]; limit=100; nextDealerId=null; autoAdvanceDealer=true; gameOver=false; cutsHistory=[]; rounds=[]; roundCounter=0; winsLog=[]; render(); } };
+  $("#newGameBtn").onclick=()=>{ players.forEach(p=>{p.score=0;p.reenganches=0;}); gameOver=false; rounds=[]; roundCounter=0; render(); window.scrollTo({top:0,behavior:"smooth"}); };
+
+  $("#roundForm").onsubmit=e=>{ e.preventDefault(); if(!validateRound()) return;
+    const inputs=roundInputs(); const cid=selectedCutter();
+    if(cid){
+      const p=players.find(function(x){return x.id===cid;});
+      const projected=clampInt(p.score||0)+clampInt(inputs[p.id]||0);
+      if(projected>limit){ $("#roundError").textContent="Cutter cannot exceed "+limit+". (Projected: "+projected+")"; $("#roundError").style.display=""; return; }
+    }
+    roundDlg.close(); applyRound(inputs,cid); setTimeout(resetViewportScaleIfZoomed,80);
+  };
+
+  /* Init */
+  load();
+  try{
+    if(!Array.isArray(players) || players.length===0){
+      addPlayer("Player 1");
+      addPlayer("Player 2");
+    } else {
+      render();
+    }
+  }catch(e){ console.error(e); players=[]; addPlayer("Player 1"); addPlayer("Player 2"); }
+
+  if('serviceWorker' in navigator){
+    window.addEventListener('load', ()=>{ navigator.serviceWorker.register('service-worker.js').catch(()=>{}); });
+  }
+})();
+</script>
 
